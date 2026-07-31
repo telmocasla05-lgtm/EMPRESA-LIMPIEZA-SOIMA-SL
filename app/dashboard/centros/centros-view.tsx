@@ -19,7 +19,16 @@ type CenterRow = {
 type ClientOption = { id: string; name: string };
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-300 focus:outline-none";
+  "w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-colors focus:border-gray-900 focus:outline-none";
+const labelClass = "mb-1.5 block text-xs font-medium text-gray-500";
+const primaryBtn =
+  "rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:opacity-40";
+const ghostBtn =
+  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
+const tinyBtn =
+  "rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
+const tinyDangerBtn =
+  "rounded-md px-2 py-1 text-xs font-medium text-red-500 transition-colors hover:bg-red-50";
 
 export function CentrosView() {
   const supabase = useMemo(() => createClient(), []);
@@ -206,28 +215,33 @@ export function CentrosView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-base font-medium tracking-tight text-gray-900">
-        Centros de trabajo
-      </h2>
+      <header>
+        <h2 className="text-xl font-medium tracking-tight text-gray-900">
+          Centros de trabajo
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Ubicaciones donde ficha tu equipo, con su radio permitido.
+        </p>
+      </header>
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-2xl space-y-4 rounded-2xl bg-gray-50 p-5"
+        className="max-w-2xl space-y-4 rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm"
       >
         <h3 className="text-sm font-medium text-gray-900">
           {editingId ? "Editar centro" : "Nuevo centro"}
         </h3>
 
         {clients.length === 0 && !loading && (
-          <p className="rounded-xl bg-amber-50/70 px-4 py-3 text-sm text-amber-700">
+          <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             Primero crea un cliente en la pestaña Clientes: cada centro
             pertenece a un cliente.
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-gray-400">Cliente</span>
+            <span className={labelClass}>Cliente</span>
             <select
               value={clientId}
               onChange={(event) => setClientId(event.target.value)}
@@ -242,7 +256,7 @@ export function CentrosView() {
             </select>
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-gray-400">Nombre del centro</span>
+            <span className={labelClass}>Nombre del centro</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -251,7 +265,7 @@ export function CentrosView() {
             />
           </label>
           <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block text-xs text-gray-400">Dirección</span>
+            <span className={labelClass}>Dirección</span>
             <input
               value={address}
               onChange={(event) => setAddress(event.target.value)}
@@ -259,7 +273,7 @@ export function CentrosView() {
             />
           </label>
           <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block text-xs text-gray-400">
+            <span className={labelClass}>
               Enlace de Google Maps (o coordenadas &quot;lat, lng&quot;)
             </span>
             <input
@@ -270,14 +284,14 @@ export function CentrosView() {
             />
             {coordsMsg && (
               <span
-                className={`mt-1 block ${coordsMsg.ok ? "text-green-700" : "text-red-600"}`}
+                className={`mt-1.5 block text-xs ${coordsMsg.ok ? "text-green-600" : "text-red-500"}`}
               >
                 {coordsMsg.text}
               </span>
             )}
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-gray-400">Latitud</span>
+            <span className={labelClass}>Latitud</span>
             <input
               value={latitude}
               onChange={(event) => setLatitude(event.target.value)}
@@ -285,7 +299,7 @@ export function CentrosView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-gray-400">Longitud</span>
+            <span className={labelClass}>Longitud</span>
             <input
               value={longitude}
               onChange={(event) => setLongitude(event.target.value)}
@@ -293,7 +307,7 @@ export function CentrosView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-gray-400">Radio (metros)</span>
+            <span className={labelClass}>Radio (metros)</span>
             <input
               value={radius}
               onChange={(event) => setRadius(event.target.value)}
@@ -301,21 +315,13 @@ export function CentrosView() {
             />
           </label>
         </div>
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
+        {formError && <p className="text-sm text-red-500">{formError}</p>}
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
-          >
+          <button type="submit" disabled={saving} className={primaryBtn}>
             {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear centro"}
           </button>
           {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-full px-4 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
-            >
+            <button type="button" onClick={resetForm} className={ghostBtn}>
               Cancelar
             </button>
           )}
@@ -323,58 +329,59 @@ export function CentrosView() {
       </form>
 
       {pageError && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{pageError}</p>
+        <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Cargando…</p>
+        <p className="text-sm text-gray-400">Cargando…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-500">Todavía no hay centros.</p>
+        <p className="text-sm text-gray-400">Todavía no hay centros.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wider text-gray-400">
-                <th className="py-2 pr-4 font-medium">Nombre</th>
-                <th className="py-2 pr-4 font-medium">Cliente</th>
-                <th className="py-2 pr-4 font-medium">Dirección</th>
-                <th className="py-2 pr-4 font-medium">Coordenadas</th>
-                <th className="py-2 pr-4 font-medium">Radio</th>
-                <th className="py-2 font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((center) => (
-                <tr key={center.id} className="border-b border-gray-50">
-                  <td className="py-2 pr-4 font-medium">{center.name}</td>
-                  <td className="py-2 pr-4">{center.clients?.name ?? "—"}</td>
-                  <td className="py-2 pr-4">{center.address ?? "—"}</td>
-                  <td className="py-2 pr-4">
-                    {center.latitude !== null && center.longitude !== null
-                      ? `${center.latitude}, ${center.longitude}`
-                      : "sin coordenadas"}
-                  </td>
-                  <td className="py-2 pr-4">{center.radius_meters} m</td>
-                  <td className="py-2">
-                    <span className="flex gap-2">
-                      <button
-                        onClick={() => startEdit(center)}
-                        className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(center)}
-                        className="rounded-full px-2.5 py-1 text-xs text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      >
-                        Eliminar
-                      </button>
-                    </span>
-                  </td>
+        <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/60 text-left text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">Cliente</th>
+                  <th className="px-5 py-3 font-medium">Dirección</th>
+                  <th className="px-5 py-3 font-medium">Coordenadas</th>
+                  <th className="px-5 py-3 font-medium">Radio</th>
+                  <th className="px-5 py-3 font-medium">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map((center) => (
+                  <tr key={center.id} className="transition-colors hover:bg-gray-50/60">
+                    <td className="px-5 py-3 font-medium">{center.name}</td>
+                    <td className="px-5 py-3">{center.clients?.name ?? "—"}</td>
+                    <td className="px-5 py-3">{center.address ?? "—"}</td>
+                    <td className="px-5 py-3 text-gray-500">
+                      {center.latitude !== null && center.longitude !== null
+                        ? `${center.latitude}, ${center.longitude}`
+                        : "sin coordenadas"}
+                    </td>
+                    <td className="px-5 py-3">{center.radius_meters} m</td>
+                    <td className="px-5 py-3">
+                      <span className="flex gap-1">
+                        <button onClick={() => startEdit(center)} className={tinyBtn}>
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(center)}
+                          className={tinyDangerBtn}
+                        >
+                          Eliminar
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
