@@ -25,6 +25,12 @@ export default async function DashboardLayout({
               Hoy
             </Link>
             <Link
+              href="/dashboard/turnos"
+              className="hover:text-gray-900 hover:underline"
+            >
+              Turnos
+            </Link>
+            <Link
               href="/dashboard/fichajes"
               className="hover:text-gray-900 hover:underline"
             >

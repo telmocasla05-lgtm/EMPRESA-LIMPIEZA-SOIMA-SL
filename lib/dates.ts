@@ -44,6 +44,24 @@ export function madridDateOf(value: string | Date): string {
   );
 }
 
+// Aritmética sobre fechas de calendario YYYY-MM-DD (sin zona horaria).
+export function addDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// Lunes de la semana a la que pertenece la fecha.
+export function mondayOf(isoDate: string): string {
+  const dayOfWeek = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
+  return addDays(isoDate, -((dayOfWeek + 6) % 7));
+}
+
+// Hora local de Madrid (0-23) de un instante.
+export function madridHourOf(value: string | Date): number {
+  return Number(formatHora(value).slice(0, 2));
+}
+
 export function formatHora(value: string | Date): string {
   return new Intl.DateTimeFormat("es-ES", {
     timeZone: MADRID_TZ,

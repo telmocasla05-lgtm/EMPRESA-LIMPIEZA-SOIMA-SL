@@ -53,3 +53,19 @@ teléfonos no registrados, que solo quedan en logs).
 
 > Nota: este flujo sustituye al eco inicial ("Recibido: …") que existía
 > durante la puesta en marcha del webhook.
+
+## Aviso de turno del día siguiente (saliente, sin conversación)
+
+Cada día a las **20:00 Europe/Madrid** un cron de Vercel
+(`/api/cron/avisos-turnos`, protegido con `CRON_SECRET`) envía a cada
+operario sus turnos de mañana aún no notificados:
+
+- Un turno: `📅 Mañana: [centro], de [inicio] a [fin]`
+- Varios turnos: `📅 Mañana tienes N turnos:` seguido de una línea `•` por
+  turno, ordenados por hora de inicio.
+
+Tras el envío se marca `shifts.notified = true`. Si el envío falla, el turno
+queda sin marcar y se registra en logs; los turnos de workers desactivados se
+omiten. Vercel Cron solo programa en UTC, así que hay dos pasadas (18:00 y
+19:00 UTC) y el endpoint ejecuta solo la que cae a las 20:00 de Madrid
+(`?force=1` la salta para pruebas manuales).
