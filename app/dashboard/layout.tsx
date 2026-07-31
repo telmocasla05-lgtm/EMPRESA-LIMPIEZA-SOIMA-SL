@@ -30,6 +30,24 @@ export default async function DashboardLayout({
             >
               Fichajes
             </Link>
+            <Link
+              href="/dashboard/operarios"
+              className="hover:text-gray-900 hover:underline"
+            >
+              Operarios
+            </Link>
+            <Link
+              href="/dashboard/clientes"
+              className="hover:text-gray-900 hover:underline"
+            >
+              Clientes
+            </Link>
+            <Link
+              href="/dashboard/centros"
+              className="hover:text-gray-900 hover:underline"
+            >
+              Centros
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">
