@@ -21,14 +21,7 @@ function normalizePhone(raw: string): string | null {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-colors focus:border-gray-900 focus:outline-none";
-const labelClass = "mb-1.5 block text-xs font-medium text-gray-500";
-const primaryBtn =
-  "rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:opacity-40";
-const ghostBtn =
-  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
-const tinyBtn =
-  "rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
+  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
 
 export function OperariosView() {
   const supabase = useMemo(() => createClient(), []);
@@ -133,25 +126,18 @@ export function OperariosView() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h2 className="text-xl font-medium tracking-tight text-gray-900">
-          Operarios
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Tu equipo y sus números de WhatsApp para fichar.
-        </p>
-      </header>
+      <h2 className="text-lg font-semibold">Operarios</h2>
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-xl space-y-4 rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm"
+        className="max-w-xl space-y-3 rounded-lg border border-gray-200 p-4"
       >
-        <h3 className="text-sm font-medium text-gray-900">
+        <h3 className="text-sm font-semibold">
           {editingId ? "Editar operario" : "Nuevo operario"}
         </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">
-            <span className={labelClass}>Nombre</span>
+            <span className="mb-1 block text-gray-500">Nombre</span>
             <input
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
@@ -159,7 +145,7 @@ export function OperariosView() {
             />
           </label>
           <label className="text-sm">
-            <span className={labelClass}>Teléfono (WhatsApp)</span>
+            <span className="mb-1 block text-gray-500">Teléfono (WhatsApp)</span>
             <input
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
@@ -168,13 +154,21 @@ export function OperariosView() {
             />
           </label>
         </div>
-        {formError && <p className="text-sm text-red-500">{formError}</p>}
+        {formError && <p className="text-sm text-red-600">{formError}</p>}
         <div className="flex gap-2">
-          <button type="submit" disabled={saving} className={primaryBtn}>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
             {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear operario"}
           </button>
           {editingId && (
-            <button type="button" onClick={resetForm} className={ghostBtn}>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+            >
               Cancelar
             </button>
           )}
@@ -182,63 +176,63 @@ export function OperariosView() {
       </form>
 
       {pageError && (
-        <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {pageError}
-        </p>
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{pageError}</p>
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Cargando…</p>
+        <p className="text-sm text-gray-500">Cargando…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-400">Todavía no hay operarios.</p>
+        <p className="text-sm text-gray-500">Todavía no hay operarios.</p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60 text-left text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  <th className="px-5 py-3 font-medium">Nombre</th>
-                  <th className="px-5 py-3 font-medium">Teléfono</th>
-                  <th className="px-5 py-3 font-medium">Estado</th>
-                  <th className="px-5 py-3 font-medium">Acciones</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-500">
+                <th className="py-2 pr-4 font-medium">Nombre</th>
+                <th className="py-2 pr-4 font-medium">Teléfono</th>
+                <th className="py-2 pr-4 font-medium">Estado</th>
+                <th className="py-2 font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((worker) => (
+                <tr
+                  key={worker.id}
+                  className={
+                    worker.active
+                      ? "border-b border-gray-100"
+                      : "border-b border-gray-100 text-gray-400"
+                  }
+                >
+                  <td className="py-2 pr-4 font-medium">{worker.full_name}</td>
+                  <td className="py-2 pr-4">{worker.phone}</td>
+                  <td className="py-2 pr-4">
+                    {worker.active ? (
+                      <span className="text-green-700">activo</span>
+                    ) : (
+                      <span>desactivado</span>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    <span className="flex gap-2">
+                      <button
+                        onClick={() => startEdit(worker)}
+                        className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 hover:bg-gray-50"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => toggleActive(worker)}
+                        className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 hover:bg-gray-50"
+                      >
+                        {worker.active ? "Desactivar" : "Reactivar"}
+                      </button>
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {rows.map((worker) => (
-                  <tr
-                    key={worker.id}
-                    className={`transition-colors hover:bg-gray-50/60 ${
-                      worker.active ? "" : "text-gray-400"
-                    }`}
-                  >
-                    <td className="px-5 py-3 font-medium">{worker.full_name}</td>
-                    <td className="px-5 py-3">{worker.phone}</td>
-                    <td className="px-5 py-3">
-                      {worker.active ? (
-                        <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                          activo
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-400">
-                          desactivado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="flex gap-1">
-                        <button onClick={() => startEdit(worker)} className={tinyBtn}>
-                          Editar
-                        </button>
-                        <button onClick={() => toggleActive(worker)} className={tinyBtn}>
-                          {worker.active ? "Desactivar" : "Reactivar"}
-                        </button>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

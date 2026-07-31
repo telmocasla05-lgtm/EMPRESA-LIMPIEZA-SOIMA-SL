@@ -28,28 +28,7 @@ type ShiftRow = {
 const OVERLAP_PG_CODE = "23P01";
 
 const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-colors focus:border-gray-900 focus:outline-none";
-const labelClass = "mb-1.5 block text-xs font-medium text-gray-500";
-const primaryBtn =
-  "rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:opacity-40";
-const ghostBtn =
-  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
-const segmentBtn =
-  "rounded-md px-2.5 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900";
-
-function formatWeekday(isoDate: string): string {
-  return new Intl.DateTimeFormat("es-ES", {
-    timeZone: "UTC",
-    weekday: "short",
-  }).format(new Date(`${isoDate}T00:00:00Z`));
-}
-
-function formatDayNumber(isoDate: string): string {
-  return new Intl.DateTimeFormat("es-ES", {
-    timeZone: "UTC",
-    day: "numeric",
-  }).format(new Date(`${isoDate}T00:00:00Z`));
-}
+  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
 
 function formatDayLabel(isoDate: string): string {
   return new Intl.DateTimeFormat("es-ES", {
@@ -304,76 +283,64 @@ export function TurnosView() {
   }
 
   const formWorker = workers.find((worker) => worker.id === form?.workerId);
-  const today = madridToday();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <header>
-          <h2 className="text-xl font-medium tracking-tight text-gray-900">
-            Turnos
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Semana del {formatLongDate(weekStart)} al{" "}
-            {formatLongDate(addDays(weekStart, 6))}
-          </p>
-        </header>
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm">
-            <button
-              onClick={() => setWeekStart(addDays(weekStart, -7))}
-              className={segmentBtn}
-              title="Semana anterior"
-            >
-              ←
-            </button>
-            <button
-              onClick={() => setWeekStart(mondayOf(madridToday()))}
-              className={segmentBtn}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => setWeekStart(addDays(weekStart, 7))}
-              className={segmentBtn}
-              title="Semana siguiente"
-            >
-              →
-            </button>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Turnos</h2>
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => setWeekStart(addDays(weekStart, -7))}
+            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+          >
+            ← Anterior
+          </button>
+          <button
+            onClick={() => setWeekStart(mondayOf(madridToday()))}
+            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+          >
+            Hoy
+          </button>
+          <button
+            onClick={() => setWeekStart(addDays(weekStart, 7))}
+            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+          >
+            Siguiente →
+          </button>
           <button
             onClick={copyPreviousWeek}
             disabled={copying}
-            className={primaryBtn}
+            className="rounded-md bg-blue-600 px-3 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {copying ? "Copiando…" : "Copiar semana anterior"}
           </button>
         </div>
       </div>
 
+      <p className="text-sm text-gray-500">
+        Semana del {formatLongDate(weekStart)} al {formatLongDate(addDays(weekStart, 6))}.
+        Haz clic en una casilla para crear un turno, o en un turno para editarlo.
+      </p>
+
       {pageError && (
-        <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {pageError}
-        </p>
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{pageError}</p>
       )}
       {notice && (
-        <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          {notice}
-        </p>
+        <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">{notice}</p>
       )}
 
       {form && (
         <form
           onSubmit={handleSubmit}
-          className="max-w-xl space-y-4 rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm"
+          className="max-w-xl space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4"
         >
-          <h3 className="text-sm font-medium text-gray-900">
+          <h3 className="text-sm font-semibold">
             {form.shiftId ? "Editar turno" : "Nuevo turno"} —{" "}
             {formWorker?.full_name ?? "operario"}, {formatDayLabel(form.date)}
           </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="text-sm">
-              <span className={labelClass}>Centro</span>
+              <span className="mb-1 block text-gray-500">Centro</span>
               <select
                 value={centerId}
                 onChange={(event) => setCenterId(event.target.value)}
@@ -388,7 +355,7 @@ export function TurnosView() {
               </select>
             </label>
             <label className="text-sm">
-              <span className={labelClass}>Inicio</span>
+              <span className="mb-1 block text-gray-500">Inicio</span>
               <input
                 type="time"
                 value={startTime}
@@ -397,7 +364,7 @@ export function TurnosView() {
               />
             </label>
             <label className="text-sm">
-              <span className={labelClass}>Fin</span>
+              <span className="mb-1 block text-gray-500">Fin</span>
               <input
                 type="time"
                 value={endTime}
@@ -406,12 +373,20 @@ export function TurnosView() {
               />
             </label>
           </div>
-          {formError && <p className="text-sm text-red-500">{formError}</p>}
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
           <div className="flex gap-2">
-            <button type="submit" disabled={saving} className={primaryBtn}>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
               {saving ? "Guardando…" : form.shiftId ? "Guardar cambios" : "Crear turno"}
             </button>
-            <button type="button" onClick={closeForm} className={ghostBtn}>
+            <button
+              type="button"
+              onClick={closeForm}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+            >
               Cancelar
             </button>
             {form.shiftId && (
@@ -419,7 +394,7 @@ export function TurnosView() {
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="ml-auto rounded-lg px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 disabled:opacity-40"
+                className="ml-auto rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
                 Borrar turno
               </button>
@@ -429,108 +404,87 @@ export function TurnosView() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Cargando…</p>
+        <p className="text-sm text-gray-500">Cargando…</p>
       ) : workers.length === 0 ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-gray-500">
           No hay operarios activos. Crea alguno en la pestaña Operarios.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="text-left">
-                  <th className="w-40 border-b border-gray-100 px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                    Operario
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="border border-gray-200 bg-gray-50 px-2 py-2 font-medium">
+                  Operario
+                </th>
+                {weekDays.map((day) => (
+                  <th
+                    key={day}
+                    className={`border border-gray-200 px-2 py-2 font-medium ${
+                      day === madridToday() ? "bg-blue-50 text-blue-700" : "bg-gray-50"
+                    }`}
+                  >
+                    {formatDayLabel(day)}
                   </th>
-                  {weekDays.map((day) => (
-                    <th
-                      key={day}
-                      className="border-b border-l border-gray-100 px-2 py-2.5 text-center font-normal"
-                    >
-                      <span className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                        {formatWeekday(day)}
-                      </span>
-                      <span
-                        className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm ${
-                          day === today
-                            ? "bg-gray-900 font-medium text-white"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {formatDayNumber(day)}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {workers.map((worker) => (
-                  <tr key={worker.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 align-top text-sm font-medium text-gray-800">
-                      {worker.full_name}
-                    </td>
-                    {weekDays.map((day) => {
-                      const cellShifts = shifts.filter(
-                        (shift) => shift.worker_id === worker.id && shift.date === day,
-                      );
-                      return (
-                        <td
-                          key={day}
-                          onClick={() => openCreate(worker.id, day)}
-                          className={`group h-20 min-w-28 cursor-pointer border-l border-gray-100 p-1.5 align-top transition-colors hover:bg-gray-50/70 ${
-                            day === today ? "bg-gray-50/50" : ""
-                          }`}
-                          title="Crear turno"
-                        >
-                          <div className="space-y-1">
-                            {cellShifts.map((shift) => (
-                              <button
-                                key={shift.id}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openEdit(shift);
-                                }}
-                                className="block w-full rounded-lg bg-blue-50 px-2 py-1.5 text-left text-xs leading-tight text-blue-700 ring-1 ring-inset ring-blue-100 transition-colors hover:bg-blue-100"
-                                title="Editar turno"
-                              >
-                                <span className="font-medium">
-                                  {formatShiftTime(shift.start_time)}–
-                                  {formatShiftTime(shift.end_time)}
-                                </span>
-                                {shift.notified && (
-                                  <span title="Aviso enviado"> ✓</span>
-                                )}
-                                <span className="block truncate text-blue-500">
-                                  {centerName(shift.center_id)}
-                                </span>
-                              </button>
-                            ))}
-                            <span className="block text-center text-sm text-gray-300 opacity-0 transition-opacity group-hover:opacity-100">
-                              +
-                            </span>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {workers.map((worker) => (
+                <tr key={worker.id}>
+                  <td className="border border-gray-200 px-2 py-2 font-medium">
+                    {worker.full_name}
+                  </td>
+                  {weekDays.map((day) => {
+                    const cellShifts = shifts.filter(
+                      (shift) => shift.worker_id === worker.id && shift.date === day,
+                    );
+                    return (
+                      <td
+                        key={day}
+                        onClick={() => openCreate(worker.id, day)}
+                        className="min-w-28 cursor-pointer border border-gray-200 px-1 py-1 align-top hover:bg-gray-50"
+                        title="Crear turno"
+                      >
+                        <div className="space-y-1">
+                          {cellShifts.map((shift) => (
+                            <button
+                              key={shift.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEdit(shift);
+                              }}
+                              className="block w-full rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-left text-xs hover:bg-blue-100"
+                              title="Editar turno"
+                            >
+                              <span className="font-medium">
+                                {formatShiftTime(shift.start_time)}–
+                                {formatShiftTime(shift.end_time)}
+                              </span>
+                              {shift.notified && (
+                                <span title="Aviso enviado"> ✓</span>
+                              )}
+                              <span className="block text-gray-600">
+                                {centerName(shift.center_id)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {centers.length === 0 && (
-            <p className="border-t border-gray-100 px-4 py-3 text-sm text-amber-700">
+            <p className="mt-3 text-sm text-amber-700">
               No hay centros creados: crea uno en la pestaña Centros antes de
               asignar turnos.
             </p>
           )}
         </div>
       )}
-
-      <p className="text-xs text-gray-400">
-        Haz clic en una casilla para crear un turno, o en un turno existente
-        para editarlo o borrarlo. ✓ = aviso de WhatsApp enviado.
-      </p>
     </div>
   );
 }
