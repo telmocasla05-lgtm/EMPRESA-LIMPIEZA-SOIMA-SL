@@ -68,7 +68,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.insert.mockResolvedValue({ error: null });
   mocks.maybeSingle.mockResolvedValue({
-    data: { id: "worker-1", company_id: "company-1" },
+    data: { id: "worker-1", company_id: "company-1", pending_action: null },
     error: null,
   });
 });
@@ -150,13 +150,16 @@ describe("POST /api/whatsapp/webhook", () => {
         content: "hola jefe",
       }),
     );
-    expect(sendWhatsAppText).toHaveBeenCalledWith(
-      "34600111222",
-      "Recibido: hola jefe",
-    );
+    // "hola jefe" no es palabra clave exacta: responde el mensaje de ayuda.
+    await vi.waitFor(() => {
+      expect(sendWhatsAppText).toHaveBeenCalledWith(
+        "34600111222",
+        expect.stringContaining("No te he entendido"),
+      );
+    });
   });
 
-  it("ignora mensajes de teléfonos no registrados", async () => {
+  it("a teléfonos no registrados les pide contactar con su empresa", async () => {
     mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
     const body = textMessagePayload("34999999999", "hola");
 
@@ -170,9 +173,11 @@ describe("POST /api/whatsapp/webhook", () => {
 
     expect(response.status).toBe(200);
     await vi.waitFor(() => {
-      expect(mocks.maybeSingle).toHaveBeenCalledTimes(1);
+      expect(sendWhatsAppText).toHaveBeenCalledWith(
+        "34999999999",
+        expect.stringContaining("Contacta con tu responsable"),
+      );
     });
     expect(mocks.insert).not.toHaveBeenCalled();
-    expect(sendWhatsAppText).not.toHaveBeenCalled();
   });
 });

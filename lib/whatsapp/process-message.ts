@@ -1,5 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
+import {
+  handleLocationMessage,
+  handleTextMessage,
+  type WhatsAppLocation,
+  type WorkerRow,
+} from "@/lib/whatsapp/time-entry";
 
 // Estructura (parcial) del payload de webhook de la Cloud API de Meta.
 type WhatsAppMessage = {
@@ -7,6 +13,7 @@ type WhatsAppMessage = {
   id: string;
   type: string;
   text?: { body: string };
+  location?: WhatsAppLocation;
 };
 
 export type WhatsAppWebhookPayload = {
@@ -35,9 +42,9 @@ async function processIncomingMessage(message: WhatsAppMessage) {
 
   // Meta manda el teléfono sin "+" (p. ej. "34600111222"); en workers.phone
   // puede estar guardado con o sin prefijo "+".
-  const { data: worker, error: workerError } = await admin
+  const { data, error: workerError } = await admin
     .from("workers")
-    .select("id, company_id")
+    .select("id, company_id, pending_action")
     .in("phone", [message.from, `+${message.from}`])
     .limit(1)
     .maybeSingle();
@@ -46,8 +53,14 @@ async function processIncomingMessage(message: WhatsAppMessage) {
     throw new Error(`Error buscando worker: ${workerError.message}`);
   }
 
+  const worker = data as WorkerRow | null;
+
   if (!worker) {
     console.warn(`[whatsapp] Mensaje de teléfono no registrado: ${message.from}`);
+    await sendWhatsAppText(
+      message.from,
+      "Este número no está dado de alta en ninguna empresa. Contacta con tu responsable para poder fichar.",
+    );
     return;
   }
 
@@ -69,7 +82,17 @@ async function processIncomingMessage(message: WhatsAppMessage) {
 
   console.log(`[whatsapp] Mensaje ${message.id} de ${message.from} guardado`);
 
-  if (text !== null) {
-    await sendWhatsAppText(message.from, `Recibido: ${text}`);
+  let reply: string | null = null;
+
+  if (message.type === "text") {
+    reply = await handleTextMessage(admin, worker, text ?? "");
+  } else if (message.type === "location" && message.location) {
+    reply = await handleLocationMessage(admin, worker, message.location);
+  } else {
+    console.log(`[whatsapp] Mensaje de tipo ${message.type} sin flujo asociado`);
+  }
+
+  if (reply) {
+    await sendWhatsAppText(message.from, reply);
   }
 }
