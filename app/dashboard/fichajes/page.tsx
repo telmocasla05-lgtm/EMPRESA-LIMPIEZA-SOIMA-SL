@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { HoyView } from "./hoy-view";
+import { FichajesView } from "./fichajes-view";
 
-export default async function DashboardPage() {
+export default async function FichajesPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -12,5 +12,5 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  return <HoyView />;
+  return <FichajesView />;
 }

@@ -1,4 +1,5 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
+import { formatHora } from "@/lib/dates";
 
 export type PendingAction = "entrada" | "salida";
 
@@ -139,7 +140,7 @@ export async function handleLocationMessage(
   await clearPendingAction(admin, worker.id);
 
   const label = intent === "entrada" ? "Entrada" : "Salida";
-  const hora = formatHoraMadrid();
+  const hora = formatHora(new Date());
 
   if (valid) {
     return `✅ ${label} registrada en ${nearest.center.name} a las ${hora}`;
@@ -185,12 +186,4 @@ function haversineMeters(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-function formatHoraMadrid(): string {
-  return new Intl.DateTimeFormat("es-ES", {
-    timeZone: "Europe/Madrid",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
 }
