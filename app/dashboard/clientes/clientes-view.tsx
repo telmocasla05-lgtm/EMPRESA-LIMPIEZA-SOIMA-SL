@@ -22,7 +22,7 @@ function parseTarifa(raw: string): number | null | "invalida" {
 }
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-300 focus:outline-none";
 
 export function ClientesView() {
   const supabase = useMemo(() => createClient(), []);
@@ -137,18 +137,18 @@ export function ClientesView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Clientes</h2>
+      <h2 className="text-base font-medium tracking-tight text-gray-900">Clientes</h2>
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-2xl space-y-3 rounded-lg border border-gray-200 p-4"
+        className="max-w-2xl space-y-4 rounded-2xl bg-gray-50 p-5"
       >
-        <h3 className="text-sm font-semibold">
+        <h3 className="text-sm font-medium text-gray-900">
           {editingId ? "Editar cliente" : "Nuevo cliente"}
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Nombre</span>
+            <span className="mb-1 block text-xs text-gray-400">Nombre</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -156,7 +156,7 @@ export function ClientesView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Tarifa por hora (€)</span>
+            <span className="mb-1 block text-xs text-gray-400">Tarifa por hora (€)</span>
             <input
               value={rate}
               onChange={(event) => setRate(event.target.value)}
@@ -165,7 +165,7 @@ export function ClientesView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Persona de contacto</span>
+            <span className="mb-1 block text-xs text-gray-400">Persona de contacto</span>
             <input
               value={contactName}
               onChange={(event) => setContactName(event.target.value)}
@@ -173,7 +173,7 @@ export function ClientesView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Teléfono de contacto</span>
+            <span className="mb-1 block text-xs text-gray-400">Teléfono de contacto</span>
             <input
               value={contactPhone}
               onChange={(event) => setContactPhone(event.target.value)}
@@ -186,7 +186,7 @@ export function ClientesView() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
           >
             {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear cliente"}
           </button>
@@ -194,7 +194,7 @@ export function ClientesView() {
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+              className="rounded-full px-4 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
               Cancelar
             </button>
@@ -203,7 +203,7 @@ export function ClientesView() {
       </form>
 
       {pageError && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{pageError}</p>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{pageError}</p>
       )}
 
       {loading ? (
@@ -214,7 +214,7 @@ export function ClientesView() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
+              <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wider text-gray-400">
                 <th className="py-2 pr-4 font-medium">Nombre</th>
                 <th className="py-2 pr-4 font-medium">Contacto</th>
                 <th className="py-2 pr-4 font-medium">Teléfono</th>
@@ -224,7 +224,7 @@ export function ClientesView() {
             </thead>
             <tbody>
               {rows.map((client) => (
-                <tr key={client.id} className="border-b border-gray-100">
+                <tr key={client.id} className="border-b border-gray-50">
                   <td className="py-2 pr-4 font-medium">{client.name}</td>
                   <td className="py-2 pr-4">{client.contact_name ?? "—"}</td>
                   <td className="py-2 pr-4">{client.contact_phone ?? "—"}</td>
@@ -239,13 +239,13 @@ export function ClientesView() {
                     <span className="flex gap-2">
                       <button
                         onClick={() => startEdit(client)}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                        className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => handleDelete(client)}
-                        className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                        className="rounded-full px-2.5 py-1 text-xs text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
                       >
                         Eliminar
                       </button>

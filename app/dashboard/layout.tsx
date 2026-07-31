@@ -16,52 +16,52 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <header className="flex items-center justify-between border-b border-gray-200 pb-4">
-        <div className="flex items-baseline gap-6">
-          <h1 className="text-xl font-semibold">Panel</h1>
-          <nav className="flex gap-4 text-sm text-gray-600">
-            <Link href="/dashboard" className="hover:text-gray-900 hover:underline">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <header className="flex items-center justify-between border-b border-gray-100 pb-5">
+        <div className="flex items-baseline gap-8">
+          <h1 className="text-lg font-medium tracking-tight text-gray-900">Panel</h1>
+          <nav className="flex gap-5 text-sm text-gray-400">
+            <Link href="/dashboard" className="transition-colors hover:text-gray-900">
               Hoy
             </Link>
             <Link
               href="/dashboard/turnos"
-              className="hover:text-gray-900 hover:underline"
+              className="transition-colors hover:text-gray-900"
             >
               Turnos
             </Link>
             <Link
               href="/dashboard/fichajes"
-              className="hover:text-gray-900 hover:underline"
+              className="transition-colors hover:text-gray-900"
             >
               Fichajes
             </Link>
             <Link
               href="/dashboard/operarios"
-              className="hover:text-gray-900 hover:underline"
+              className="transition-colors hover:text-gray-900"
             >
               Operarios
             </Link>
             <Link
               href="/dashboard/clientes"
-              className="hover:text-gray-900 hover:underline"
+              className="transition-colors hover:text-gray-900"
             >
               Clientes
             </Link>
             <Link
               href="/dashboard/centros"
-              className="hover:text-gray-900 hover:underline"
+              className="transition-colors hover:text-gray-900"
             >
               Centros
             </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{user.email}</span>
+          <span className="text-xs text-gray-400">{user.email}</span>
           <LogoutButton />
         </div>
       </header>
-      <main className="mt-6">{children}</main>
+      <main className="mt-8">{children}</main>
     </div>
   );
 }

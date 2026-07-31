@@ -21,7 +21,7 @@ function normalizePhone(raw: string): string | null {
 }
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-300 focus:outline-none";
 
 export function OperariosView() {
   const supabase = useMemo(() => createClient(), []);
@@ -126,18 +126,18 @@ export function OperariosView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Operarios</h2>
+      <h2 className="text-base font-medium tracking-tight text-gray-900">Operarios</h2>
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-xl space-y-3 rounded-lg border border-gray-200 p-4"
+        className="max-w-xl space-y-4 rounded-2xl bg-gray-50 p-5"
       >
-        <h3 className="text-sm font-semibold">
+        <h3 className="text-sm font-medium text-gray-900">
           {editingId ? "Editar operario" : "Nuevo operario"}
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Nombre</span>
+            <span className="mb-1 block text-xs text-gray-400">Nombre</span>
             <input
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
@@ -145,7 +145,7 @@ export function OperariosView() {
             />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block text-gray-500">Teléfono (WhatsApp)</span>
+            <span className="mb-1 block text-xs text-gray-400">Teléfono (WhatsApp)</span>
             <input
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
@@ -159,7 +159,7 @@ export function OperariosView() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
           >
             {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear operario"}
           </button>
@@ -167,7 +167,7 @@ export function OperariosView() {
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+              className="rounded-full px-4 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
               Cancelar
             </button>
@@ -176,7 +176,7 @@ export function OperariosView() {
       </form>
 
       {pageError && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{pageError}</p>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{pageError}</p>
       )}
 
       {loading ? (
@@ -187,7 +187,7 @@ export function OperariosView() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
+              <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wider text-gray-400">
                 <th className="py-2 pr-4 font-medium">Nombre</th>
                 <th className="py-2 pr-4 font-medium">Teléfono</th>
                 <th className="py-2 pr-4 font-medium">Estado</th>
@@ -200,30 +200,34 @@ export function OperariosView() {
                   key={worker.id}
                   className={
                     worker.active
-                      ? "border-b border-gray-100"
-                      : "border-b border-gray-100 text-gray-400"
+                      ? "border-b border-gray-50"
+                      : "border-b border-gray-50 text-gray-400"
                   }
                 >
                   <td className="py-2 pr-4 font-medium">{worker.full_name}</td>
                   <td className="py-2 pr-4">{worker.phone}</td>
                   <td className="py-2 pr-4">
                     {worker.active ? (
-                      <span className="text-green-700">activo</span>
+                      <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-600">
+                        activo
+                      </span>
                     ) : (
-                      <span>desactivado</span>
+                      <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-400">
+                        desactivado
+                      </span>
                     )}
                   </td>
                   <td className="py-2">
                     <span className="flex gap-2">
                       <button
                         onClick={() => startEdit(worker)}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 hover:bg-gray-50"
+                        className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => toggleActive(worker)}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 hover:bg-gray-50"
+                        className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
                       >
                         {worker.active ? "Desactivar" : "Reactivar"}
                       </button>

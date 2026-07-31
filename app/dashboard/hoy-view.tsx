@@ -130,13 +130,15 @@ export function HoyView() {
   return (
     <div className="space-y-8">
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
           Error cargando datos: {error}
         </p>
       )}
 
       <section>
-        <h2 className="text-lg font-semibold">Fichados ahora mismo</h2>
+        <h2 className="text-base font-medium tracking-tight text-gray-900">
+          Fichados ahora mismo
+        </h2>
         {active.length === 0 ? (
           <p className="mt-2 text-sm text-gray-500">
             No hay nadie fichado en este momento.
@@ -145,7 +147,7 @@ export function HoyView() {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-gray-500">
+                <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wider text-gray-400">
                   <th className="py-2 pr-4 font-medium">Operario</th>
                   <th className="py-2 pr-4 font-medium">Centro</th>
                   <th className="py-2 pr-4 font-medium">Entrada</th>
@@ -154,7 +156,7 @@ export function HoyView() {
               </thead>
               <tbody>
                 {active.map((worker) => (
-                  <tr key={worker.workerId} className="border-b border-gray-100">
+                  <tr key={worker.workerId} className="border-b border-gray-50">
                     <td className="py-2 pr-4 font-medium">{worker.name}</td>
                     <td className="py-2 pr-4">{worker.centerName}</td>
                     <td className="py-2 pr-4">{formatHora(worker.since)}</td>
@@ -168,7 +170,9 @@ export function HoyView() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold">Pendientes de revisión</h2>
+        <h2 className="text-base font-medium tracking-tight text-gray-900">
+          Pendientes de revisión
+        </h2>
         {forReview.length === 0 ? (
           <p className="mt-2 text-sm text-gray-500">
             Ningún fichaje pendiente de revisión hoy.
@@ -178,7 +182,7 @@ export function HoyView() {
             {forReview.map((entry) => (
               <li
                 key={entry.id}
-                className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm"
+                className="rounded-xl bg-amber-50/70 px-4 py-3 text-sm text-amber-800"
               >
                 <span className="font-medium">
                   {entry.workers?.full_name ?? "(sin nombre)"}

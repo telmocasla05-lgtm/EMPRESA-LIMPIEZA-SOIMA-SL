@@ -142,15 +142,17 @@ export function FichajesView() {
   }
 
   const inputClass =
-    "rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none";
+    "rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-800 focus:border-blue-300 focus:outline-none";
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Histórico de fichajes</h2>
+      <h2 className="text-base font-medium tracking-tight text-gray-900">
+        Histórico de fichajes
+      </h2>
 
       <div className="flex flex-wrap items-end gap-4">
         <label className="text-sm">
-          <span className="mb-1 block text-gray-500">Fecha</span>
+          <span className="mb-1 block text-xs text-gray-400">Fecha</span>
           <input
             type="date"
             value={date}
@@ -159,7 +161,7 @@ export function FichajesView() {
           />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-gray-500">Operario</span>
+          <span className="mb-1 block text-xs text-gray-400">Operario</span>
           <select
             value={workerId}
             onChange={(event) => setWorkerId(event.target.value)}
@@ -174,7 +176,7 @@ export function FichajesView() {
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-gray-500">Centro</span>
+          <span className="mb-1 block text-xs text-gray-400">Centro</span>
           <select
             value={centerId}
             onChange={(event) => setCenterId(event.target.value)}
@@ -191,7 +193,7 @@ export function FichajesView() {
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
       )}
 
       {loading ? (
@@ -204,7 +206,7 @@ export function FichajesView() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
+              <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wider text-gray-400">
                 <th className="py-2 pr-4 font-medium">Hora</th>
                 <th className="py-2 pr-4 font-medium">Operario</th>
                 <th className="py-2 pr-4 font-medium">Centro</th>
@@ -222,8 +224,8 @@ export function FichajesView() {
                     key={row.id}
                     className={
                       row.valid
-                        ? "border-b border-gray-100"
-                        : "border-b border-gray-100 bg-amber-50"
+                        ? "border-b border-gray-50"
+                        : "border-b border-gray-50 bg-amber-50/60"
                     }
                   >
                     <td className="py-2 pr-4">
@@ -301,9 +303,11 @@ export function FichajesView() {
                           válido
                         </label>
                       ) : row.valid ? (
-                        <span className="text-green-700">válido</span>
+                        <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-600">
+                          válido
+                        </span>
                       ) : (
-                        <span className="font-medium text-amber-700">
+                        <span className="rounded-full bg-amber-100/70 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                           revisión
                         </span>
                       )}
@@ -319,7 +323,7 @@ export function FichajesView() {
                           <button
                             onClick={() => saveEdit(row)}
                             disabled={saving}
-                            className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
                           >
                             {saving ? "Guardando…" : "Guardar"}
                           </button>
@@ -328,7 +332,7 @@ export function FichajesView() {
                               setEditingId(null);
                               setEditForm(null);
                             }}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                            className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
                           >
                             Cancelar
                           </button>
@@ -336,7 +340,7 @@ export function FichajesView() {
                       ) : (
                         <button
                           onClick={() => startEdit(row)}
-                          className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                          className="rounded-full px-2.5 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
                         >
                           Corregir
                         </button>

@@ -28,7 +28,7 @@ type ShiftRow = {
 const OVERLAP_PG_CODE = "23P01";
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-300 focus:outline-none";
 
 function formatDayLabel(isoDate: string): string {
   return new Intl.DateTimeFormat("es-ES", {
@@ -287,30 +287,30 @@ export function TurnosView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Turnos</h2>
+        <h2 className="text-base font-medium tracking-tight text-gray-900">Turnos</h2>
         <div className="flex items-center gap-2 text-sm">
           <button
             onClick={() => setWeekStart(addDays(weekStart, -7))}
-            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+            className="rounded-full px-3 py-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
           >
             ← Anterior
           </button>
           <button
             onClick={() => setWeekStart(mondayOf(madridToday()))}
-            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+            className="rounded-full px-3 py-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
           >
             Hoy
           </button>
           <button
             onClick={() => setWeekStart(addDays(weekStart, 7))}
-            className="rounded-md border border-gray-300 px-2 py-1 hover:bg-gray-50"
+            className="rounded-full px-3 py-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
           >
             Siguiente →
           </button>
           <button
             onClick={copyPreviousWeek}
             disabled={copying}
-            className="rounded-md bg-blue-600 px-3 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-full bg-blue-100 px-4 py-1.5 font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
           >
             {copying ? "Copiando…" : "Copiar semana anterior"}
           </button>
@@ -323,24 +323,24 @@ export function TurnosView() {
       </p>
 
       {pageError && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{pageError}</p>
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{pageError}</p>
       )}
       {notice && (
-        <p className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">{notice}</p>
+        <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-600">{notice}</p>
       )}
 
       {form && (
         <form
           onSubmit={handleSubmit}
-          className="max-w-xl space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4"
+          className="max-w-xl space-y-4 rounded-2xl bg-gray-50 p-5"
         >
-          <h3 className="text-sm font-semibold">
+          <h3 className="text-sm font-medium text-gray-900">
             {form.shiftId ? "Editar turno" : "Nuevo turno"} —{" "}
             {formWorker?.full_name ?? "operario"}, {formatDayLabel(form.date)}
           </h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="text-sm">
-              <span className="mb-1 block text-gray-500">Centro</span>
+              <span className="mb-1 block text-xs text-gray-400">Centro</span>
               <select
                 value={centerId}
                 onChange={(event) => setCenterId(event.target.value)}
@@ -355,7 +355,7 @@ export function TurnosView() {
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-gray-500">Inicio</span>
+              <span className="mb-1 block text-xs text-gray-400">Inicio</span>
               <input
                 type="time"
                 value={startTime}
@@ -364,7 +364,7 @@ export function TurnosView() {
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-gray-500">Fin</span>
+              <span className="mb-1 block text-xs text-gray-400">Fin</span>
               <input
                 type="time"
                 value={endTime}
@@ -378,14 +378,14 @@ export function TurnosView() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
             >
               {saving ? "Guardando…" : form.shiftId ? "Guardar cambios" : "Crear turno"}
             </button>
             <button
               type="button"
               onClick={closeForm}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+              className="rounded-full px-4 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
             >
               Cancelar
             </button>
@@ -394,7 +394,7 @@ export function TurnosView() {
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="ml-auto rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                className="ml-auto rounded-full px-4 py-2 text-sm text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
               >
                 Borrar turno
               </button>
@@ -413,15 +413,15 @@ export function TurnosView() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="text-left text-gray-500">
-                <th className="border border-gray-200 bg-gray-50 px-2 py-2 font-medium">
+              <tr className="text-left text-xs uppercase tracking-wider text-gray-400">
+                <th className="border border-gray-100 px-2 py-2.5 font-medium">
                   Operario
                 </th>
                 {weekDays.map((day) => (
                   <th
                     key={day}
-                    className={`border border-gray-200 px-2 py-2 font-medium ${
-                      day === madridToday() ? "bg-blue-50 text-blue-700" : "bg-gray-50"
+                    className={`border border-gray-100 px-2 py-2.5 font-medium ${
+                      day === madridToday() ? "bg-blue-50/60 text-blue-500" : ""
                     }`}
                   >
                     {formatDayLabel(day)}
@@ -432,7 +432,7 @@ export function TurnosView() {
             <tbody>
               {workers.map((worker) => (
                 <tr key={worker.id}>
-                  <td className="border border-gray-200 px-2 py-2 font-medium">
+                  <td className="border border-gray-100 px-2 py-2 font-medium text-gray-700">
                     {worker.full_name}
                   </td>
                   {weekDays.map((day) => {
@@ -443,7 +443,7 @@ export function TurnosView() {
                       <td
                         key={day}
                         onClick={() => openCreate(worker.id, day)}
-                        className="min-w-28 cursor-pointer border border-gray-200 px-1 py-1 align-top hover:bg-gray-50"
+                        className="min-w-28 cursor-pointer border border-gray-100 px-1 py-1 align-top transition-colors hover:bg-gray-50/70"
                         title="Crear turno"
                       >
                         <div className="space-y-1">
@@ -454,7 +454,7 @@ export function TurnosView() {
                                 event.stopPropagation();
                                 openEdit(shift);
                               }}
-                              className="block w-full rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-left text-xs hover:bg-blue-100"
+                              className="block w-full rounded-lg bg-blue-50 px-2 py-1 text-left text-xs text-blue-900 transition-colors hover:bg-blue-100"
                               title="Editar turno"
                             >
                               <span className="font-medium">
@@ -464,7 +464,7 @@ export function TurnosView() {
                               {shift.notified && (
                                 <span title="Aviso enviado"> ✓</span>
                               )}
-                              <span className="block text-gray-600">
+                              <span className="block text-blue-400">
                                 {centerName(shift.center_id)}
                               </span>
                             </button>
