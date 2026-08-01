@@ -20,7 +20,7 @@ vi.mock("next/server", () => ({
 
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
-  maybeSingle: vi.fn(),
+  workerQuery: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -29,9 +29,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       table === "workers"
         ? {
             select: () => ({
-              in: () => ({
-                limit: () => ({ maybeSingle: mocks.maybeSingle }),
-              }),
+              in: () => ({ limit: mocks.workerQuery }),
             }),
           }
         : { insert: mocks.insert },
@@ -67,8 +65,8 @@ function textMessagePayload(from: string, body: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.insert.mockResolvedValue({ error: null });
-  mocks.maybeSingle.mockResolvedValue({
-    data: { id: "worker-1", company_id: "company-1", pending_action: null },
+  mocks.workerQuery.mockResolvedValue({
+    data: [{ id: "worker-1", company_id: "company-1", pending_action: null }],
     error: null,
   });
 });
@@ -160,7 +158,7 @@ describe("POST /api/whatsapp/webhook", () => {
   });
 
   it("a teléfonos no registrados les pide contactar con su empresa", async () => {
-    mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.workerQuery.mockResolvedValue({ data: [], error: null });
     const body = textMessagePayload("34999999999", "hola");
 
     const response = await POST(

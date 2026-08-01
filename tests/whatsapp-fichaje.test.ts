@@ -16,6 +16,9 @@ const PHONE = "34618559210";
 
 const state = vi.hoisted(() => ({
   worker: null as WorkerRow | null,
+  // Segundo worker con el mismo teléfono en otra company (workers.phone es
+  // único por company, no a nivel global).
+  duplicateWorker: null as WorkerRow | null,
   centers: [] as Record<string, unknown>[],
   lastEntry: null as { type: string } | null,
 }));
@@ -34,14 +37,18 @@ vi.mock("@/lib/supabase/admin", () => ({
           return {
             select: () => ({
               in: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: state.worker, error: null }),
+                limit: async () => ({
+                  data: [state.worker, state.duplicateWorker].filter(Boolean),
+                  error: null,
                 }),
               }),
             }),
-            update: (values: unknown) => ({
+            update: (values: Record<string, unknown>) => ({
               eq: async () => {
                 mocks.workerUpdate(values);
+                // El worker se relee en cada mensaje: la actualización tiene
+                // que verse en la siguiente entrega del webhook.
+                if (state.worker) Object.assign(state.worker, values);
                 return { error: null };
               },
             }),
@@ -137,7 +144,9 @@ function lastReply(): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
   state.worker = { id: "worker-1", company_id: "company-1", pending_action: null };
+  state.duplicateWorker = null;
   state.centers = [{ ...CENTRO_SOL }];
   state.lastEntry = null;
 });
@@ -303,5 +312,88 @@ describe("casos límite", () => {
     expect(lastReply()).toContain("no tiene centros");
     expect(mocks.timeEntryInsert).not.toHaveBeenCalled();
     expect(mocks.workerUpdate).toHaveBeenLastCalledWith({ pending_action: null });
+  });
+
+  it("centros sin coordenadas se tratan como si no hubiera centros", async () => {
+    state.worker!.pending_action = "entrada";
+    // Centro recién creado al que aún no le han puesto el enlace de Maps.
+    state.centers = [
+      {
+        id: "centro-sin-mapa",
+        name: "Centro Nuevo",
+        latitude: null,
+        longitude: null,
+        radius_meters: 200,
+      },
+    ];
+
+    await processWebhookPayload(
+      locationPayload(CENTRO_SOL.latitude, CENTRO_SOL.longitude),
+    );
+
+    expect(lastReply()).toContain("no tiene centros");
+    expect(mocks.timeEntryInsert).not.toHaveBeenCalled();
+    expect(mocks.workerUpdate).toHaveBeenLastCalledWith({ pending_action: null });
+  });
+
+  it("la reentrega del mismo mensaje no registra un segundo fichaje", async () => {
+    state.worker!.pending_action = "entrada";
+    const payload = locationPayload(CENTRO_SOL.latitude, CENTRO_SOL.longitude);
+
+    // Meta reintenta la entrega del mismo evento: al limpiarse la acción
+    // pendiente, la segunda pasada ya no ficha.
+    await processWebhookPayload(payload);
+    await processWebhookPayload(payload);
+
+    expect(mocks.timeEntryInsert).toHaveBeenCalledTimes(1);
+    expect(lastReply()).toContain("escribe *entro* o *salgo*");
+  });
+
+  it("un teléfono de alta en dos empresas no ficha en ninguna", async () => {
+    state.duplicateWorker = {
+      id: "worker-2",
+      company_id: "company-2",
+      pending_action: null,
+    };
+
+    await processWebhookPayload(textPayload("entro"));
+
+    expect(lastReply()).toContain("más de una empresa");
+    expect(mocks.workerUpdate).not.toHaveBeenCalled();
+    expect(mocks.messageInsert).not.toHaveBeenCalled();
+    expect(mocks.timeEntryInsert).not.toHaveBeenCalled();
+  });
+});
+
+// El reloj del sistema va en UTC (vitest.config.ts): estos tests fijan un
+// instante UTC y esperan la hora local de Madrid.
+describe("hora de Madrid", () => {
+  it("confirma la entrada con la hora local, no la UTC", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-03T07:00:00Z")); // 09:00 en Madrid (CEST)
+    state.worker!.pending_action = "entrada";
+
+    await processWebhookPayload(
+      locationPayload(CENTRO_SOL.latitude, CENTRO_SOL.longitude),
+    );
+
+    expect(lastReply()).toBe("✅ Entrada registrada en Centro Sol a las 09:00");
+  });
+
+  it("la salida pasada la medianoche sigue siendo válida y con hora local", async () => {
+    vi.useFakeTimers();
+    // 22:30 UTC del día 3 son las 00:30 del día 4 en Madrid.
+    vi.setSystemTime(new Date("2026-08-03T22:30:00Z"));
+    state.worker!.pending_action = "salida";
+    state.lastEntry = { type: "entrada" };
+
+    await processWebhookPayload(
+      locationPayload(CENTRO_SOL.latitude, CENTRO_SOL.longitude),
+    );
+
+    expect(mocks.timeEntryInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "salida", valid: true }),
+    );
+    expect(lastReply()).toBe("✅ Salida registrada en Centro Sol a las 00:30");
   });
 });

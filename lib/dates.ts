@@ -18,9 +18,14 @@ function offsetMinutesAt(utc: Date): number {
 }
 
 // Instante UTC que corresponde a una fecha y hora locales de Madrid.
+// Dos pasadas: la primera aplica el offset del instante aproximado y la
+// segunda lo recalcula sobre el instante ya corregido. Sin la segunda, las
+// horas del domingo de cambio a horario de verano salen una hora antes.
+// Una hora inexistente (02:30 al adelantar) se resuelve hacia adelante.
 export function madridInstant(isoDate: string, hhmm = "00:00"): Date {
   const guess = new Date(`${isoDate}T${hhmm}:00Z`);
-  return new Date(guess.getTime() - offsetMinutesAt(guess) * 60_000);
+  const approx = new Date(guess.getTime() - offsetMinutesAt(guess) * 60_000);
+  return new Date(guess.getTime() - offsetMinutesAt(approx) * 60_000);
 }
 
 export function madridDayStart(isoDate: string): Date {

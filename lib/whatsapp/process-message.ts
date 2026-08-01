@@ -46,14 +46,30 @@ async function processIncomingMessage(message: WhatsAppMessage) {
     .from("workers")
     .select("id, company_id, pending_action")
     .in("phone", [message.from, `+${message.from}`])
-    .limit(1)
-    .maybeSingle();
+    .limit(2);
 
   if (workerError) {
     throw new Error(`Error buscando worker: ${workerError.message}`);
   }
 
-  const worker = data as WorkerRow | null;
+  const matches = (data ?? []) as WorkerRow[];
+
+  // workers.phone es único por company, no a nivel global: el mismo número
+  // puede estar de alta en dos empresas. Meta solo manda el teléfono, así que
+  // no hay forma de saber a cuál pertenece el fichaje; registrarlo en una
+  // cualquiera lo metería en la company equivocada.
+  if (matches.length > 1) {
+    console.error(
+      `[whatsapp] Teléfono ${message.from} dado de alta en varias empresas: mensaje no procesado`,
+    );
+    await sendWhatsAppText(
+      message.from,
+      "Tu número está dado de alta en más de una empresa y no puedo saber en cuál estás fichando. Contacta con tu responsable.",
+    );
+    return;
+  }
+
+  const worker = matches[0] ?? null;
 
   if (!worker) {
     console.warn(`[whatsapp] Mensaje de teléfono no registrado: ${message.from}`);

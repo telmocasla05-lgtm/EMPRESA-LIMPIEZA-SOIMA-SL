@@ -13,5 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // La máquina de desarrollo ya está en Europe/Madrid: sin fijar UTC, un
+    // fallo de conversión de zona horaria pasaría desapercibido en los tests.
+    env: { TZ: "UTC" },
   },
 });
