@@ -69,3 +69,32 @@ queda sin marcar y se registra en logs; los turnos de workers desactivados se
 omiten. Vercel Cron solo programa en UTC, así que hay dos pasadas (18:00 y
 19:00 UTC) y el endpoint ejecuta solo la que cae a las 20:00 de Madrid
 (`?force=1` la salta para pruebas manuales).
+
+## Aviso de ausencia al admin (saliente, sin conversación)
+
+Cada **15 minutos** un cron de Vercel (`/api/cron/ausencias`, protegido con
+`CRON_SECRET`) busca turnos de hoy y de ayer (por los cercanos a medianoche)
+que empezaron hace **más de 20 minutos** sin fichaje de entrada del worker.
+
+El worker cuenta como presente si:
+
+- tiene una **entrada** entre una hora antes del inicio y el fin del turno
+  (las pendientes de revisión, `valid = false`, también cuentan), o
+- al empezar el turno **seguía fichado** de un turno anterior (turnos
+  encadenados con un único fichaje).
+
+Cada ausencia se registra una sola vez en `absences` (única por turno) y se
+avisa al **teléfono de la company** (`companies.phone`):
+
+```
+⚠️ [Nombre] no ha fichado en [centro] (turno de [hora])
+Sustitutos disponibles: [hasta 5 workers activos sin turno a esa hora]
+```
+
+Si no hay nadie libre, la segunda línea dice
+`No hay sustitutos disponibles sin turno a esa hora.`
+
+`absences.notified = true` se marca tras el envío: **nunca se avisa dos veces
+por la misma ausencia**. Si el envío falla, la pasada siguiente lo reintenta
+sin volver a registrarla; los turnos de workers desactivados se omiten y las
+ausencias del día se muestran en la vista **Hoy** del panel.

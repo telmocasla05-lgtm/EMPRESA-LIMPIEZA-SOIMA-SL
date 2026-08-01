@@ -8,6 +8,7 @@ import {
   madridDayStart,
   madridToday,
 } from "@/lib/dates";
+import { formatShiftTime } from "@/lib/shifts/overlap";
 
 type EntryRow = {
   id: string;
@@ -17,6 +18,14 @@ type EntryRow = {
   created_at: string;
   workers: { full_name: string } | null;
   centers: { name: string } | null;
+};
+
+type AbsenceRow = {
+  id: string;
+  detected_at: string;
+  workers: { full_name: string } | null;
+  centers: { name: string } | null;
+  shifts: { start_time: string } | null;
 };
 
 type ActiveWorker = {
@@ -72,6 +81,7 @@ function computeActiveWorkers(entries: EntryRow[], now: Date): ActiveWorker[] {
 export function HoyView() {
   const supabase = useMemo(() => createClient(), []);
   const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [absences, setAbsences] = useState<AbsenceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -97,8 +107,25 @@ export function HoyView() {
     setNow(new Date());
   }, [supabase]);
 
+  const fetchAbsences = useCallback(async () => {
+    const { data, error: fetchError } = await supabase
+      .from("absences")
+      .select(
+        "id, detected_at, workers ( full_name ), centers ( name ), shifts ( start_time )",
+      )
+      .eq("date", madridToday())
+      .order("detected_at", { ascending: true });
+
+    if (fetchError) {
+      setError(fetchError.message);
+      return;
+    }
+    setAbsences((data ?? []) as unknown as AbsenceRow[]);
+  }, [supabase]);
+
   useEffect(() => {
     fetchEntries();
+    fetchAbsences();
 
     const channel = supabase
       .channel("fichajes-hoy")
@@ -107,6 +134,13 @@ export function HoyView() {
         { event: "*", schema: "public", table: "time_entries" },
         () => {
           fetchEntries();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "absences" },
+        () => {
+          fetchAbsences();
         },
       )
       .subscribe();
@@ -118,7 +152,7 @@ export function HoyView() {
       supabase.removeChannel(channel);
       clearInterval(tick);
     };
-  }, [supabase, fetchEntries]);
+  }, [supabase, fetchEntries, fetchAbsences]);
 
   const active = computeActiveWorkers(entries, now);
   const forReview = entries.filter((entry) => !entry.valid);
@@ -134,6 +168,34 @@ export function HoyView() {
           Error cargando datos: {error}
         </p>
       )}
+
+      <section>
+        <h2 className="text-lg font-semibold">Ausencias de hoy</h2>
+        {absences.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            Ninguna ausencia detectada hoy.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {absences.map((absence) => (
+              <li
+                key={absence.id}
+                className="rounded-md border-l-4 border-red-500 bg-red-50 p-3 text-sm"
+              >
+                <span className="font-medium">
+                  {absence.workers?.full_name ?? "(sin nombre)"}
+                </span>{" "}
+                — no ha fichado en {absence.centers?.name ?? "(sin centro)"}{" "}
+                (turno de{" "}
+                {absence.shifts
+                  ? formatShiftTime(absence.shifts.start_time)
+                  : "—"}
+                )
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section>
         <h2 className="text-lg font-semibold">Fichados ahora mismo</h2>
