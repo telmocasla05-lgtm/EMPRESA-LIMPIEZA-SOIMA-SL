@@ -318,6 +318,14 @@ export async function emitirFactura({
     fallo("La factura no tiene horas: no se puede emitir");
   }
 
+  // 4 bis. Sin tarifa, calcularTotales aplica 0 €/h y saldría una factura
+  // legal, numerada e inmutable, de 0,00 €. Mejor no emitir.
+  if (!cliente.hourly_rate || cliente.hourly_rate <= 0) {
+    fallo(
+      `El cliente ${cliente.name} no tiene tarifa por hora: la factura saldría a 0 €`,
+    );
+  }
+
   // 5. Congelar la cabecera con lo recalculado.
   const dueDate = addDays(issueDate, cliente.payment_terms_days ?? 30);
   const { error: errorCongelar } = await supabase
@@ -338,9 +346,20 @@ export async function emitirFactura({
   if (errorCongelar) fallo(errorCongelar.message);
 
   // 6. Trazabilidad: qué jornadas concretas entran en esta factura.
+  //
+  // Se reescribe entera, igual que las líneas. Con un upsert, un intento de
+  // emisión que fallara más tarde dejaría vivas jornadas que ya no entran en
+  // la factura (p. ej. un fichaje corregido a otro centro), y la factura
+  // quedaría justificada por horas que no cobra.
+  const { error: errorBorrarJornadas } = await supabase
+    .from("invoice_time_entries")
+    .delete()
+    .eq("invoice_id", invoiceId);
+  if (errorBorrarJornadas) fallo(errorBorrarJornadas.message);
+
   const jornadas = horas.porCentro.flatMap((centro) => centro.jornadas);
   if (jornadas.length > 0) {
-    const { error } = await supabase.from("invoice_time_entries").upsert(
+    const { error } = await supabase.from("invoice_time_entries").insert(
       jornadas.map((jornada) => ({
         invoice_id: invoiceId,
         entry_in_id: jornada.entry_in_id,
@@ -351,7 +370,6 @@ export async function emitirFactura({
         work_date: jornada.work_date,
         minutes: jornada.minutes,
       })),
-      { onConflict: "invoice_id,entry_in_id" },
     );
     if (error) fallo(error.message);
   }

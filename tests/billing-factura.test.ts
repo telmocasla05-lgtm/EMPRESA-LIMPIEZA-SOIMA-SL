@@ -22,12 +22,14 @@ try {
 }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!url || !serviceRoleKey) {
+if (!url || !anonKey || !serviceRoleKey) {
   throw new Error(
-    "Test de facturación sin configurar: rellena NEXT_PUBLIC_SUPABASE_URL y " +
-      "SUPABASE_SERVICE_ROLE_KEY en .env.local y aplica las migraciones.",
+    "Test de facturación sin configurar: rellena NEXT_PUBLIC_SUPABASE_URL, " +
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY en .env.local " +
+      "y aplica las migraciones.",
   );
 }
 
@@ -35,12 +37,36 @@ const admin: SupabaseClient = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+// Sesiones reales de usuario: service_role se salta la RLS, así que emitir con
+// `admin` no demuestra que el panel pueda emitir. Estas dos sí.
+const sesionAdmin: SupabaseClient = createClient(url, anonKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+const sesionManager: SupabaseClient = createClient(url, anonKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+
 const suffix = randomUUID().slice(0, 8);
+const password = `Prueba-${randomUUID()}`;
 const JULIO = { periodStart: "2026-07-01", periodEnd: "2026-07-31" };
 
 let companyId: string;
+let companyAjenaId: string;
+let usuarioAdminId: string;
+let usuarioManagerId: string;
 let contadorOperarios = 0;
 const rutasSubidas: string[] = [];
+
+// Último número entregado de la serie 2026 de esta company (0 si aún ninguno).
+async function ultimoNumero(): Promise<number> {
+  const { data } = await admin
+    .from("invoice_counters")
+    .select("last_number")
+    .eq("company_id", companyId)
+    .eq("series", "2026")
+    .maybeSingle();
+  return (data?.last_number as number | undefined) ?? 0;
+}
 
 function must<T>(result: { data: T; error: { message: string } | null }): NonNullable<T> {
   if (result.error) throw new Error(result.error.message);
@@ -161,14 +187,56 @@ describe("generación y emisión de facturas", () => {
         .single(),
     );
     companyId = company.id;
-  }, 60_000);
+
+    // Un admin y un manager de verdad, con sesión iniciada: son los dos roles
+    // que el módulo distingue (leer toda la company, escribir solo admin).
+    const nuevoUsuario = async (marca: string, role: "admin" | "manager") => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: `factura-${marca}-${suffix}@example.com`,
+        password,
+        email_confirm: true,
+      });
+      if (error) throw error;
+      must(
+        await admin
+          .from("profiles")
+          .insert({
+            id: data.user.id,
+            company_id: companyId,
+            full_name: `${role} ${marca}`,
+            role,
+          })
+          .select("id"),
+      );
+      return data.user.id;
+    };
+
+    usuarioAdminId = await nuevoUsuario("admin", "admin");
+    usuarioManagerId = await nuevoUsuario("manager", "manager");
+
+    for (const [cliente, marca] of [
+      [sesionAdmin, "admin"],
+      [sesionManager, "manager"],
+    ] as const) {
+      const { error } = await cliente.auth.signInWithPassword({
+        email: `factura-${marca}-${suffix}@example.com`,
+        password,
+      });
+      if (error) throw error;
+    }
+  }, 90_000);
 
   afterAll(async () => {
     if (rutasSubidas.length > 0) {
       await admin.storage.from(BUCKET_FACTURAS).remove(rutasSubidas);
     }
+    if (usuarioAdminId) await admin.auth.admin.deleteUser(usuarioAdminId);
+    if (usuarioManagerId) await admin.auth.admin.deleteUser(usuarioManagerId);
     if (companyId) await admin.from("companies").delete().eq("id", companyId);
-  }, 60_000);
+    if (companyAjenaId) {
+      await admin.from("companies").delete().eq("id", companyAjenaId);
+    }
+  }, 90_000);
 
   it("crea el borrador con su desglose por centro", { timeout: 30_000 }, async () => {
     const { clientId, centerId, workerId } = await crearCliente(`Normal ${suffix}`, 14);
@@ -534,6 +602,183 @@ describe("generación y emisión de facturas", () => {
     await expect(
       emitirFactura({ supabase: admin, invoiceId: borrador.invoiceId }),
     ).rejects.toThrow(/NIF del cliente/);
+  });
+
+  // Las demás pruebas de este fichero emiten con service_role, que se salta la
+  // RLS: ninguna demuestra que el panel pueda emitir. Esta recorre el camino
+  // real (cliente de la sesión, como actions.ts) de principio a fin.
+  it("un admin emite desde su sesión, sin service_role", {
+    timeout: 60_000,
+  }, async () => {
+    const { clientId, centerId, workerId } = await crearCliente(`Sesión ${suffix}`, 14);
+    await ficharJornada(centerId, workerId, "2026-07-23", "08:00", "16:00");
+
+    const borrador = await generarBorrador({
+      supabase: sesionAdmin,
+      clientId,
+      ...JULIO,
+    });
+    if (!borrador.creada) throw new Error("no se creó el borrador");
+
+    const emision = await emitirFactura({
+      supabase: sesionAdmin,
+      invoiceId: borrador.invoiceId,
+      issueDate: "2026-08-01",
+    });
+    if (emision.pdfPath) rutasSubidas.push(emision.pdfPath);
+
+    expect(emision.invoiceNumber).toMatch(/^2026\/\d{4}$/);
+    // El PDF también se sube con la sesión: prueba la política del bucket.
+    expect(emision.pdfError).toBeUndefined();
+
+    const factura = must(
+      await admin
+        .from("invoices")
+        .select("status, issued_by")
+        .eq("id", borrador.invoiceId)
+        .single(),
+    );
+    expect(factura.status).toBe("emitida");
+    expect(factura.issued_by).toBe(usuarioAdminId);
+
+    // La trazabilidad es lo que la RLS bloqueaba: sin política de insert,
+    // invoice_time_entries dejaba la emisión a medias.
+    const jornadas = must(
+      await admin
+        .from("invoice_time_entries")
+        .select("minutes")
+        .eq("invoice_id", borrador.invoiceId),
+    );
+    expect(jornadas).toHaveLength(1);
+    expect(jornadas[0].minutes).toBe(480);
+  });
+
+  it("un manager no puede emitir, y no gasta número al intentarlo", {
+    timeout: 60_000,
+  }, async () => {
+    const { clientId, centerId, workerId } = await crearCliente(`Manager ${suffix}`, 14);
+    await ficharJornada(centerId, workerId, "2026-07-24", "08:00", "16:00");
+    const borrador = await generarBorrador({ supabase: admin, clientId, ...JULIO });
+    if (!borrador.creada) throw new Error("no se creó el borrador");
+
+    const antes = await ultimoNumero();
+
+    await expect(
+      emitirFactura({
+        supabase: sesionManager,
+        invoiceId: borrador.invoiceId,
+        issueDate: "2026-08-01",
+      }),
+    ).rejects.toThrow();
+
+    // Ni número consumido (sería un hueco permanente) ni factura emitida.
+    expect(await ultimoNumero()).toBe(antes);
+    const factura = must(
+      await admin
+        .from("invoices")
+        .select("status, invoice_number")
+        .eq("id", borrador.invoiceId)
+        .single(),
+    );
+    expect(factura.status).toBe("borrador");
+    expect(factura.invoice_number).toBeNull();
+  });
+
+  it("nadie puede gastar números del contador de otra company", {
+    timeout: 30_000,
+  }, async () => {
+    const ajena = must(
+      await admin
+        .from("companies")
+        .insert({ name: `Ajena ${suffix} S.L.` })
+        .select("id")
+        .single(),
+    );
+    companyAjenaId = ajena.id as string;
+
+    // next_invoice_number es SECURITY DEFINER: se salta la RLS de
+    // invoice_counters, así que tiene que comprobar la company por su cuenta.
+    // Sin esa comprobación, esto le dejaría un hueco en la numeración a otra
+    // empresa desde una sesión cualquiera.
+    const { error } = await sesionAdmin.rpc("next_invoice_number", {
+      p_company: companyAjenaId,
+      p_series: "2026",
+    });
+    expect(error).not.toBeNull();
+    expect(error?.message).toMatch(/otra company/);
+
+    const contadorAjeno = await admin
+      .from("invoice_counters")
+      .select("last_number")
+      .eq("company_id", companyAjenaId)
+      .maybeSingle();
+    expect(contadorAjeno.data).toBeNull();
+  });
+
+  it("no emite un cliente sin tarifa: saldría una factura de 0 €", {
+    timeout: 30_000,
+  }, async () => {
+    const { clientId, centerId, workerId } = await crearCliente(`Sin tarifa ${suffix}`, 14);
+    await ficharJornada(centerId, workerId, "2026-07-25", "08:00", "16:00");
+    must(
+      await admin
+        .from("clients")
+        .update({ hourly_rate: null })
+        .eq("id", clientId)
+        .select("id"),
+    );
+
+    const borrador = await generarBorrador({ supabase: admin, clientId, ...JULIO });
+    if (!borrador.creada) throw new Error("no se creó el borrador");
+
+    // El borrador se genera con horas pero a 0 €: es el aviso de que falta la
+    // tarifa, no algo emitible.
+    const previa = must(
+      await admin
+        .from("invoices")
+        .select("total_hours, total")
+        .eq("id", borrador.invoiceId)
+        .single(),
+    );
+    expect(Number(previa.total_hours)).toBe(8);
+    expect(Number(previa.total)).toBe(0);
+
+    await expect(
+      emitirFactura({ supabase: admin, invoiceId: borrador.invoiceId }),
+    ).rejects.toThrow(/tarifa/i);
+
+    const despues = must(
+      await admin
+        .from("invoices")
+        .select("status")
+        .eq("id", borrador.invoiceId)
+        .single(),
+    );
+    expect(despues.status).toBe("borrador");
+  });
+
+  it("el 1 de enero abre serie nueva y el número vuelve a empezar", {
+    timeout: 60_000,
+  }, async () => {
+    const { clientId, centerId, workerId } = await crearCliente(`Año nuevo ${suffix}`, 10);
+    await ficharJornada(centerId, workerId, "2026-07-26", "08:00", "16:00");
+    const borrador = await generarBorrador({ supabase: admin, clientId, ...JULIO });
+    if (!borrador.creada) throw new Error("no se creó el borrador");
+
+    // La serie sale de la fecha de emisión, no del periodo facturado.
+    const emision = await emitirFactura({
+      supabase: admin,
+      invoiceId: borrador.invoiceId,
+      issueDate: "2027-01-02",
+    });
+    if (emision.pdfPath) rutasSubidas.push(emision.pdfPath);
+
+    expect(emision.series).toBe("2027");
+    expect(emision.number).toBe(1);
+    expect(emision.invoiceNumber).toBe("2027/0001");
+
+    // Y el contador de 2026 sigue donde estaba: son contadores distintos.
+    expect(await ultimoNumero()).toBeGreaterThan(0);
   });
 
   it("aplica el IVA del cliente, incluido el exento", {

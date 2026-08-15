@@ -3,6 +3,7 @@ import { madridInstant } from "@/lib/dates";
 import {
   calcularHorasFacturables,
   emparejarJornadas,
+  MAX_JORNADA_MINUTES,
   minutosAHoras,
   redondeoHalfUp,
   type CentroRow,
@@ -169,6 +170,37 @@ describe("emparejarJornadas (SPEC 4.1)", () => {
 
     expect(jornadas).toEqual([]);
     expect(incidencias[0].codigo).toBe("duracion_excesiva");
+  });
+
+  // La frontera exacta del límite: doblar turno son 16 h clavadas y se
+  // factura; un minuto más ya es un fichaje mal cerrado. Sin este test, dar la
+  // vuelta al operador de horas.ts (> por >=) no rompería nada.
+  it("16 h exactas se facturan y 16 h y 1 min son duracion_excesiva", () => {
+    const justo = emparejarJornadas(jornada("2026-07-06", "06:00", "22:00"));
+    expect(justo.incidencias).toEqual([]);
+    expect(justo.jornadas[0].minutes).toBe(MAX_JORNADA_MINUTES);
+
+    const pasado = emparejarJornadas(jornada("2026-07-07", "06:00", "22:01"));
+    expect(pasado.jornadas).toEqual([]);
+    expect(pasado.incidencias[0].codigo).toBe("duracion_excesiva");
+  });
+
+  // Los fichajes reales llegan de WhatsApp con created_at al segundo, no en
+  // minutos redondos: este redondeo es el único que se aplica a datos de
+  // producción.
+  it("redondea a minutos los segundos del fichaje", () => {
+    const conSegundos = (desde: string, hasta: string) => {
+      const [entrada, salida] = jornada("2026-07-06", "08:00", "16:00");
+      return emparejarJornadas([
+        { ...entrada, created_at: `2026-07-06T${desde}Z` },
+        { ...salida, created_at: `2026-07-06T${hasta}Z` },
+      ]).jornadas[0].minutes;
+    };
+
+    // 7 h 30 min 29 s → 450 min; 30 s justos → 451 (half up).
+    expect(conSegundos("06:00:00.000", "13:30:29.000")).toBe(450);
+    expect(conSegundos("06:00:00.000", "13:30:30.000")).toBe(451);
+    expect(conSegundos("06:00:00.000", "13:30:31.000")).toBe(451);
   });
 
   it("entrar y salir en el mismo minuto es duracion_cero", () => {
