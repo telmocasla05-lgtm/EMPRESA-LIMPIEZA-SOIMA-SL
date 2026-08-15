@@ -40,14 +40,23 @@ export async function emitirFacturaAction(
     });
     refrescar(invoiceId);
 
-    // El PDF va fuera de la transacción: si falla, la factura está emitida y
-    // es válida igualmente, solo queda el PDF pendiente.
-    return {
-      ok: true,
-      mensaje: emision.pdfError
-        ? `Factura ${emision.invoiceNumber} emitida, pero el PDF no se pudo guardar (${emision.pdfError}).`
-        : `Factura ${emision.invoiceNumber} emitida.`,
-    };
+    // El PDF y el aviso por WhatsApp van fuera de la transacción: si fallan,
+    // la factura está emitida y es válida igualmente.
+    const partes = [`Factura ${emision.invoiceNumber} emitida`];
+    if (emision.pdfError) {
+      partes.push(`el PDF no se pudo guardar (${emision.pdfError})`);
+    }
+    if (emision.aviso.cliente === "enviado") {
+      partes.push("enviada al cliente por WhatsApp");
+    } else if (emision.aviso.cliente === "sin_telefono") {
+      partes.push(
+        "no se pudo enviar al cliente: no tiene teléfono de contacto en su ficha",
+      );
+    } else if (emision.aviso.cliente === "error_envio") {
+      partes.push(`no se pudo enviar al cliente por WhatsApp (${emision.aviso.error})`);
+    }
+
+    return { ok: true, mensaje: `${partes.join(", ")}.` };
   } catch (error) {
     return { ok: false, error: textoDeError(error) };
   }

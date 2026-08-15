@@ -7,6 +7,7 @@
 
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { addDays, madridToday } from "@/lib/dates";
+import { avisarFacturaEmitida, type ResultadoAviso } from "@/lib/billing/aviso";
 import {
   calcularHorasFacturables,
   type CentroRow,
@@ -15,8 +16,9 @@ import {
 } from "@/lib/billing/horas";
 import { calcularTotales, formatFecha } from "@/lib/billing/importes";
 import { generarPdfFactura, type DatosFacturaPdf } from "@/lib/billing/pdf";
+import { BUCKET_FACTURAS } from "@/lib/billing/storage";
 
-export const BUCKET_FACTURAS = "facturas";
+export { BUCKET_FACTURAS, urlFirmadaFactura } from "@/lib/billing/storage";
 
 // Un día de margen a cada lado, que es lo que necesita el emparejado de
 // jornadas nocturnas (ver MARGEN_MS en horas.ts).
@@ -30,6 +32,8 @@ type ClienteFila = {
   id: string;
   company_id: string;
   name: string;
+  contact_name: string | null;
+  contact_phone: string | null;
   hourly_rate: number | null;
   vat_rate: number;
   tax_id: string | null;
@@ -42,10 +46,12 @@ type ClienteFila = {
 };
 
 const CAMPOS_CLIENTE =
-  "id, company_id, name, hourly_rate, vat_rate, tax_id, address, postal_code, city, province, payment_method, payment_terms_days";
+  "id, company_id, name, contact_name, contact_phone, hourly_rate, vat_rate, tax_id, address, postal_code, city, province, payment_method, payment_terms_days";
 
+// phone es el teléfono al que se avisa al admin cuando una factura se emite
+// pero no se le puede enviar al cliente (aviso.ts).
 const CAMPOS_EMPRESA =
-  "id, name, tax_id, address, postal_code, city, province, iban";
+  "id, name, phone, tax_id, address, postal_code, city, province, iban";
 
 function fallo(mensaje: string): never {
   throw new Error(mensaje);
@@ -242,6 +248,7 @@ export type ResultadoEmision = {
   number: number;
   pdfPath: string | null;
   pdfError?: string;
+  aviso: ResultadoAviso;
 };
 
 // Emite un borrador: le pone número, congela los importes y genera el PDF.
@@ -385,6 +392,18 @@ export async function emitirFactura({
     pdfError = error instanceof Error ? error.message : String(error);
   }
 
+  // 9. Y ya emitida, el aviso al cliente con el enlace del PDF. Igual que el
+  // PDF: si no sale, la factura sigue emitida y quien se entera es el admin
+  // (aviso.ts), nunca se deshace la emisión.
+  const aviso = await avisarFacturaEmitida({
+    supabase,
+    cliente,
+    empresa: empresaData as { name: string; phone: string | null },
+    invoiceNumber,
+    totalCentimos: totales.totalCentimos,
+    pdfPath,
+  });
+
   return {
     invoiceId,
     invoiceNumber,
@@ -392,6 +411,7 @@ export async function emitirFactura({
     number: cabecera.number as number,
     pdfPath,
     ...(pdfError ? { pdfError } : {}),
+    aviso,
   };
 }
 
@@ -479,18 +499,4 @@ async function generarYGuardarPdf({
   if (errorRuta) fallo(errorRuta.message);
 
   return path;
-}
-
-// URL de descarga temporal. El bucket es privado: nunca se expone, y la firma
-// caduca en 60 segundos (SPEC 3).
-export async function urlFirmadaFactura(
-  supabase: SupabaseClient,
-  pdfPath: string,
-  segundos = 60,
-): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(BUCKET_FACTURAS)
-    .createSignedUrl(pdfPath, segundos);
-  if (error) fallo(error.message);
-  return data.signedUrl;
 }
