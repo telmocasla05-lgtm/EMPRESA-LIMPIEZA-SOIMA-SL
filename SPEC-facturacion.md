@@ -38,9 +38,33 @@ factura de ese cliente queda bloqueada y el panel dice exactamente qué hay que 
 | 11 | PDF | Real, generado en servidor con **pdf-lib** (dependencia nueva aprobada), guardado en Supabase Storage |
 | 12 | Corrección posterior | Factura **rectificativa** en serie propia; la original nunca se toca |
 | 13 | Jornada a caballo de dos meses | Va entera al mes de la **entrada** |
-| 14 | Entrega | Descarga desde el panel (sin envío automático) |
+| 14 | Entrega | Descarga desde el panel **y** aviso automático al cliente por WhatsApp al emitir (revisada, ver 1.1) |
 | 15 | Permisos | `manager` ve y resuelve incidencias; solo `admin` emite, rectifica y anula |
 | 16 | Cobro | Vencimiento y forma de pago por cliente; IBAN de la empresa en el PDF |
+
+### 1.1 Decisiones revisadas después de la entrevista
+
+**Decisión 14 (2026-08-15): el envío automático entra en el módulo.**
+
+Al emitir, el cliente recibe un WhatsApp en su `contact_phone` con el número de
+factura, el importe y un enlace de descarga del PDF. Estaba en "fuera de alcance"
+por trabajo pendiente, no por criterio: sin él, cada factura emitida obliga a
+descargarla del panel y reenviarla a mano, que es justo lo que este SaaS viene a
+quitar. Implementado en `lib/billing/aviso.ts`.
+
+Tres reglas que lo acotan:
+
+- **Nunca tumba una emisión.** Cuando llega el aviso la factura ya tiene número y
+  valor legal. Si el cliente no tiene teléfono, si el PDF no se guardó o si Meta
+  rechaza el envío, la factura se queda emitida y se avisa al admin de la company
+  en `companies.phone`. El error jamás sube hasta deshacer la emisión.
+- **El enlace del WhatsApp dura 30 días**, no 60 segundos (ver sección 3): el
+  cliente abre el mensaje cuando le viene bien, y el plazo de pago habitual es de
+  30 días. Es un enlace firmado sin sesión: quien lo tenga puede descargar esa
+  factura —y solo esa— hasta que caduque. Asumido: expone menos que enviar el PDF
+  adjunto por email, y es la factura de su propio destinatario.
+- **No es configurable todavía.** No hay forma de desactivarlo por company ni por
+  cliente. Si algún día hace falta, ahí es donde toca.
 
 ---
 
@@ -322,8 +346,14 @@ bucket_id = 'facturas'
 and (storage.foldername(name))[1] = public.user_company_id()::text
 ```
 
-La descarga va por un route handler que valida la sesión y devuelve una URL firmada de
-60 segundos. Nunca se expone el bucket ni la `service_role` al cliente.
+La descarga **desde el panel** va por un route handler que valida la sesión y devuelve
+una URL firmada de 60 segundos. Nunca se expone el bucket ni la `service_role` al
+cliente.
+
+El enlace que se manda al cliente por WhatsApp (decisión 14 revisada, ver 1.1) es la
+excepción: se firma para 30 días, porque su destinatario no tiene sesión en el panel y
+abre el mensaje cuando puede. Sigue siendo una URL firmada sobre el bucket privado, de
+una sola factura y con caducidad.
 
 ---
 
@@ -690,9 +720,10 @@ Ejecutar solo el test afectado, no toda la suite (CLAUDE.md).
 
 ## 11. Fuera de alcance (por ahora)
 
-- Envío automático por email o WhatsApp (decisión 14: solo descarga). El campo de email
-  del cliente y el proveedor de correo quedan para más adelante; nada de este diseño
-  impide añadirlo después.
+- Envío automático por **email**. El WhatsApp al emitir sí está hecho (decisión 14
+  revisada, ver 1.1); el campo de email del cliente y el proveedor de correo quedan para
+  más adelante.
+- Desactivar el aviso de WhatsApp por company o por cliente: hoy se envía siempre.
 - Abonos parciales, pagos a cuenta, conciliación bancaria: solo hay `paid_at` (cobrada
   sí/no).
 - Recargo de equivalencia, IRPF, operaciones intracomunitarias, multi-divisa.
