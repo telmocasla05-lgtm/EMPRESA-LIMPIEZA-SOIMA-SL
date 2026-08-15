@@ -10,6 +10,8 @@ import {
   madridNextDayStart,
   madridToday,
   mondayOf,
+  monthPeriod,
+  previousMonth,
 } from "@/lib/dates";
 
 // De estas conversiones dependen el margen de gracia de las ausencias
@@ -106,5 +108,30 @@ describe("aritmética de calendario", () => {
     expect(formatDuracion(3_900_000)).toBe("1 h 05 min");
     expect(formatDuracion(0)).toBe("0 h 00 min");
     expect(formatDuracion(-5_000)).toBe("0 h 00 min");
+  });
+});
+
+describe("periodos mensuales de facturación", () => {
+  it("monthPeriod cubre el mes entero, sea de 28, 30 o 31 días", () => {
+    expect(monthPeriod("2026-07")).toEqual({
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+    });
+    expect(monthPeriod("2026-04").periodEnd).toBe("2026-04-30");
+    expect(monthPeriod("2026-02").periodEnd).toBe("2026-02-28");
+    expect(monthPeriod("2028-02").periodEnd).toBe("2028-02-29"); // bisiesto
+    expect(monthPeriod("2026-12").periodEnd).toBe("2026-12-31"); // cambio de año
+  });
+
+  it("monthPeriod rechaza un mes que no existe", () => {
+    expect(() => monthPeriod("2026-13")).toThrow(/no válido/);
+    expect(() => monthPeriod("julio")).toThrow(/no válido/);
+  });
+
+  it("previousMonth retrocede un mes, también en enero", () => {
+    expect(previousMonth("2026-08-15")).toBe("2026-07");
+    expect(previousMonth("2026-03-01")).toBe("2026-02");
+    // El cierre del 1 de enero factura diciembre del año anterior.
+    expect(previousMonth("2027-01-01")).toBe("2026-12");
   });
 });

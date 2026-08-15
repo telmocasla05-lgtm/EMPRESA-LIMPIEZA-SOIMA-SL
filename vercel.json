@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/avisos-turnos", "schedule": "0 18 * * *" },
     { "path": "/api/cron/avisos-turnos", "schedule": "0 19 * * *" },
-    { "path": "/api/cron/ausencias", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/ausencias", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/facturacion", "schedule": "0 5 1 * *" }
   ]
 }

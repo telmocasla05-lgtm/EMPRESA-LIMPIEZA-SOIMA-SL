@@ -56,6 +56,32 @@ export function addDays(isoDate: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+// Periodo de un mes natural: "2026-07" → 2026-07-01 … 2026-07-31.
+// El fin se saca restando un día al 1 del mes siguiente, así los meses de 28,
+// 30 y 31 días salen solos.
+export function monthPeriod(yearMonth: string): {
+  periodStart: string;
+  periodEnd: string;
+} {
+  const [year, month] = yearMonth.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) {
+    throw new Error(`Mes no válido: ${yearMonth} (formato AAAA-MM)`);
+  }
+  const siguiente =
+    month === 12
+      ? `${year + 1}-01-01`
+      : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  return { periodStart: `${yearMonth}-01`, periodEnd: addDays(siguiente, -1) };
+}
+
+// Mes natural anterior al de una fecha: "2026-08-15" → "2026-07".
+export function previousMonth(isoDate: string): string {
+  const [year, month] = isoDate.slice(0, 7).split("-").map(Number);
+  return month === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
 // Lunes de la semana a la que pertenece la fecha.
 export function mondayOf(isoDate: string): string {
   const dayOfWeek = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
