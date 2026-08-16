@@ -1,7 +1,8 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { abrirIncidencia } from "@/lib/whatsapp/incidencias";
+import { registrarIncidencia } from "@/lib/whatsapp/incidencias";
 import { classifyIntent } from "@/lib/whatsapp/intent";
+import { type MediaEntrante } from "@/lib/whatsapp/media";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
 import {
   handleLocationMessage,
@@ -15,15 +16,8 @@ const PEDIR_ACLARACION =
   "🤔 No sé si quieres fichar o reportar una incidencia.\n" +
   "Para fichar escribe *entro* o *salgo*. Si es una incidencia, cuéntame en una frase qué ha pasado.";
 
-const INCIDENCIA_REGISTRADA =
-  "✅ Incidencia registrada. Tu responsable la verá en el panel.";
-
-const INCIDENCIA_SIN_CLASIFICAR =
-  "⚠️ No he entendido bien tu mensaje, así que lo he registrado como incidencia para que tu responsable lo revise.";
-
-const INCIDENCIA_SIN_TEXTO =
-  "📷 Recibido, he abierto una incidencia.\n" +
-  "¿Me cuentas en una frase qué ha pasado? Así tu responsable sabrá qué necesitas.";
+// Adjunto de la Cloud API: el id sirve para descargarlo de la Graph API.
+type WhatsAppMedia = { id: string; mime_type?: string; caption?: string };
 
 // Estructura (parcial) del payload de webhook de la Cloud API de Meta.
 type WhatsAppMessage = {
@@ -32,6 +26,8 @@ type WhatsAppMessage = {
   type: string;
   text?: { body: string };
   location?: WhatsAppLocation;
+  image?: WhatsAppMedia;
+  audio?: WhatsAppMedia;
 };
 
 export type WhatsAppWebhookPayload = {
@@ -98,7 +94,12 @@ async function processIncomingMessage(message: WhatsAppMessage) {
     return;
   }
 
-  const text = message.type === "text" ? (message.text?.body ?? "") : null;
+  // El pie de foto también es texto del operario: se guarda en el mensaje y
+  // sirve para clasificar la incidencia.
+  const text =
+    message.type === "text"
+      ? (message.text?.body ?? "")
+      : (message.image?.caption ?? null);
 
   const { error: insertError } = await admin.from("whatsapp_messages").insert({
     company_id: worker.company_id,
@@ -123,11 +124,13 @@ async function processIncomingMessage(message: WhatsAppMessage) {
   } else if (message.type === "location" && message.location) {
     reply = await handleLocationMessage(admin, worker, message.location);
   } else if (message.type === "image" || message.type === "audio") {
-    // Una foto o un audio sueltos solo pueden ser un reporte: para fichar hace
-    // falta ubicación. No se clasifican con IA (no hay texto que leer): se abre
-    // la incidencia sin clasificar y se le pide al operario que la describa.
-    await abrirIncidencia(admin, worker, null);
-    reply = INCIDENCIA_SIN_TEXTO;
+    // Una foto o un audio solo pueden ser un reporte: para fichar hace falta
+    // ubicación. El audio se transcribe y la foto se pasa a la IA con el pie
+    // de foto, si lo hay.
+    reply = await registrarIncidencia(admin, worker, {
+      texto: text,
+      media: mediaDelMensaje(message),
+    });
   } else {
     console.log(`[whatsapp] Mensaje de tipo ${message.type} sin flujo asociado`);
   }
@@ -151,7 +154,9 @@ async function routeTextMessage(
   }
 
   const { intent, motivo, error } = await classifyIntent(text);
-  console.log(`[whatsapp] Intención "${intent}" para «${text}»: ${motivo}`);
+  console.log(
+    `[whatsapp] Intención "${intent}" para «${text}»: ${error ?? motivo}`,
+  );
 
   switch (intent) {
     case "fichaje":
@@ -159,9 +164,22 @@ async function routeTextMessage(
       // responde con la ayuda (*entro* / *salgo*) sin registrar nada.
       return handleTextMessage(admin, worker, text);
     case "incidencia":
-      await abrirIncidencia(admin, worker, text);
-      return error ? INCIDENCIA_SIN_CLASIFICAR : INCIDENCIA_REGISTRADA;
+      // Segunda llamada a la IA, esta vez para el tipo y la urgencia: son dos
+      // preguntas distintas (qué es el mensaje / qué clase de problema es) y
+      // separarlas deja el fichaje fuera del prompt de incidencias.
+      return registrarIncidencia(admin, worker, { texto: text });
     case "desconocido":
       return PEDIR_ACLARACION;
   }
+}
+
+function mediaDelMensaje(message: WhatsAppMessage): MediaEntrante | null {
+  const media = message.image ?? message.audio;
+  if (!media) return null;
+
+  return {
+    kind: message.image ? "image" : "audio",
+    id: media.id,
+    mimeType: media.mime_type ?? null,
+  };
 }

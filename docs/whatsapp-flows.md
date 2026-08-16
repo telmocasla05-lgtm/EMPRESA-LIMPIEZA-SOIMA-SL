@@ -7,7 +7,7 @@ Antes de tratar un mensaje como fichaje se decide qué intención tiene
 
 ```
 1. ¿Palabra clave exacta de fichaje?  → flujo de fichaje (sin IA)
-2. ¿Foto o audio?                     → incidencia sin descripción (sin IA)
+2. ¿Foto o audio?                     → flujo de incidencias (sin clasificar intención)
 3. Resto de textos                    → clasificación con la API de Claude
 4. Cualquier otro tipo                → solo se guarda, sin respuesta
 ```
@@ -33,10 +33,69 @@ red— el mensaje entra como **incidencia sin clasificar** y se avisa al
 operario. Es deliberado: perder un reporte (un cable pelado, un suelo mojado)
 cuesta mucho más que una incidencia de más, que el jefe cierra desde el panel.
 
-> Pendiente del módulo de incidencias (`SPEC-incidencias.md`): tipo, centro
-> deducido del fichaje abierto, descarga de la foto a Storage y aviso al
-> responsable. De momento la incidencia se abre con los valores por defecto
-> (`sin_clasificar`, urgencia normal, abierta) y solo se ve en el panel.
+> Pendiente del módulo de incidencias (`SPEC-incidencias.md`): el **aviso al
+> responsable** del tipo y **la sección del panel**. Hasta que exista la
+> pantalla, una incidencia solo es visible consultando la tabla `incidents` en
+> Supabase.
+
+## Flujo de incidencias
+
+```
+Operario                                    Sistema
+   │  "se ha roto el carro de la 2ª planta"    │
+   │──────────────────────────────────────────>│  1. audio → Whisper
+   │                                           │  2. tipo y urgencia → Claude
+   │                                           │  3. centro = fichaje abierto
+   │                                           │  4. alta en incidents (open)
+   │  "📋 Incidencia registrada: …"            │  5. foto → bucket privado
+   │<──────────────────────────────────────────│
+```
+
+El alta vive en `lib/whatsapp/incidencias.ts`. Pasos, en orden:
+
+1. **Adjunto.** Foto y audio se bajan de la Graph API en dos llamadas
+   (`lib/whatsapp/media.ts`): primero los metadatos, después los bytes — esa
+   segunda URL caduca en minutos, así que no se guarda. Límite de 8 MB.
+2. **Audio → texto.** La nota de voz se transcribe con **Whisper**
+   (`lib/ia/transcribir-audio.ts`, `OPENAI_API_KEY`) y la transcripción hace de
+   descripción. Es la única llamada del proyecto a un modelo que no es Claude.
+3. **Tipo y urgencia.** `lib/ia/clasificar-incidencia.ts` manda a Claude el
+   texto y, si la hay, **la foto** (visión, base64). Mismos parámetros que la
+   clasificación de intención: `claude-opus-5`, `effort: "low"`, salida
+   estructurada. Solo se llama si hay algo que leer.
+
+   | Tipo | Ejemplo |
+   |---|---|
+   | `material_roto` | "se ha roto la fregona", "la aspiradora echa humo" |
+   | `falta_stock` | "no queda papel", "se ha acabado la lejía" |
+   | `desperfecto` | "hay un cristal partido", "el grifo gotea" |
+   | `seguridad` | "hay un cable pelado", "suelo mojado sin señalizar" |
+   | `sin_clasificar` | La IA falló, o solo hay una foto sin describir |
+
+   La urgencia la decide la IA, con una regla que manda sobre ella:
+   **`seguridad` siempre es `alta`**.
+4. **Centro.** El del fichaje de entrada abierto: se lee el último movimiento
+   del operario en `time_entries` y, si es una `entrada`, se toma su centro. Si
+   es una `salida` o no hay ninguno, la incidencia queda **sin centro** y el
+   jefe se lo asigna en el panel. Los fichajes pendientes de revisión
+   (`valid = false`) cuentan: el operario está donde está.
+5. **Alta** en `incidents` con `status = 'open'`.
+6. **Foto** al bucket privado `incidencias`, en
+   `<company_id>/<incident_id>/<media_id>.<ext>`, y la ruta en `photo_url`
+   (una ruta, no una URL pública: el panel la sirve firmada a 60 s).
+
+Respuestas al operario:
+
+| Situación | Mensaje |
+|---|---|
+| Clasificada | `📋 Incidencia registrada: [tipo]. Nos ponemos en ello.` |
+| Sin clasificar (falló la IA) | `⚠️ No he entendido bien tu mensaje, así que lo he registrado…` |
+| Foto o audio sin nada que leer | `📷 Recibido, he abierto una incidencia. ¿Me cuentas…?` |
+
+**Regla de oro: no perder nunca un reporte.** Si falla la descarga del adjunto,
+la transcripción, la clasificación o la subida a Storage, la incidencia se abre
+igual y lo que falte queda a la vista en el panel. Solo un error de la propia
+inserción en `incidents` corta el flujo.
 
 ## Flujo de fichaje (entrada/salida)
 

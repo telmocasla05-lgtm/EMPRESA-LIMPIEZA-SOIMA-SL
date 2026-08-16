@@ -7,6 +7,8 @@ import { sendWhatsAppText } from "@/lib/whatsapp/send";
 import type { WorkerRow } from "@/lib/whatsapp/time-entry";
 
 const PHONE = "34618559210";
+const RESPUESTA_INCIDENCIA =
+  "📋 Incidencia registrada: Material roto. Nos ponemos en ello.";
 
 const state = vi.hoisted(() => ({
   worker: null as WorkerRow | null,
@@ -16,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   // Llamada a la API de Claude.
   create: vi.fn(),
   messageInsert: vi.fn(),
-  incidentInsert: vi.fn(),
+  registrarIncidencia: vi.fn(),
   workerUpdate: vi.fn(),
 }));
 
@@ -54,13 +56,6 @@ vi.mock("@/lib/supabase/admin", () => ({
               return { error: null };
             },
           };
-        case "incidents":
-          return {
-            insert: async (row: unknown) => {
-              mocks.incidentInsert(row);
-              return { error: null };
-            },
-          };
         default:
           throw new Error(`Tabla no esperada en el mock: ${table}`);
       }
@@ -70,6 +65,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/whatsapp/send", () => ({
   sendWhatsAppText: vi.fn().mockResolvedValue(undefined),
+}));
+
+// El alta de la incidencia (transcripción, tipo, centro, foto) se prueba en
+// incidencias.test.ts; aquí solo importa a qué flujo se enruta el mensaje.
+vi.mock("@/lib/whatsapp/incidencias", () => ({
+  registrarIncidencia: mocks.registrarIncidencia,
 }));
 
 // Respuesta con la forma que devuelve la API con salida estructurada.
@@ -110,6 +111,7 @@ function lastReply(): string {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("ANTHROPIC_API_KEY", "clave-de-prueba");
+  mocks.registrarIncidencia.mockResolvedValue(RESPUESTA_INCIDENCIA);
   state.worker = { id: "worker-1", company_id: "company-1", pending_action: null };
 });
 
@@ -124,7 +126,7 @@ describe("las palabras clave no llegan a la IA", () => {
       await processWebhookPayload(textPayload(texto));
 
       expect(mocks.create).not.toHaveBeenCalled();
-      expect(mocks.incidentInsert).not.toHaveBeenCalled();
+      expect(mocks.registrarIncidencia).not.toHaveBeenCalled();
       expect(mocks.workerUpdate).toHaveBeenCalled();
       expect(lastReply()).toContain("ubicación");
     },
@@ -146,7 +148,7 @@ describe("fichajes claros sin palabra clave", () => {
     expect(lastReply()).toContain("*salgo*");
     // Sin ubicación no se ficha, y esto no es una incidencia.
     expect(mocks.workerUpdate).not.toHaveBeenCalled();
-    expect(mocks.incidentInsert).not.toHaveBeenCalled();
+    expect(mocks.registrarIncidencia).not.toHaveBeenCalled();
   });
 });
 
@@ -157,19 +159,17 @@ describe("incidencias claras", () => {
     "hay un cristal partido en la puerta de entrada",
     "ojo que hay un cable pelado en el pasillo",
     "la aspiradora echa humo y huele a quemado",
-  ])("«%s» abre incidencia y lo confirma", async (texto) => {
+  ])("«%s» se enruta al flujo de incidencias", async (texto) => {
     mocks.create.mockResolvedValue(respuestaIA("incidencia"));
 
     await processWebhookPayload(textPayload(texto));
 
-    expect(mocks.incidentInsert).toHaveBeenCalledWith({
-      company_id: "company-1",
-      worker_id: "worker-1",
-      description: texto,
-    });
-    expect(lastReply()).toBe(
-      "✅ Incidencia registrada. Tu responsable la verá en el panel.",
+    expect(mocks.registrarIncidencia).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: "worker-1", company_id: "company-1" }),
+      { texto },
     );
+    expect(lastReply()).toBe(RESPUESTA_INCIDENCIA);
     expect(mocks.workerUpdate).not.toHaveBeenCalled();
   });
 });
@@ -188,26 +188,31 @@ describe("mensajes ambiguos", () => {
 
     expect(lastReply()).toContain("No sé si quieres fichar o reportar una incidencia");
     expect(lastReply()).toContain("*entro*");
-    expect(mocks.incidentInsert).not.toHaveBeenCalled();
+    expect(mocks.registrarIncidencia).not.toHaveBeenCalled();
     expect(mocks.workerUpdate).not.toHaveBeenCalled();
   });
 });
 
 describe("foto y audio", () => {
-  it("una foto abre incidencia sin descripción y pide que la cuente", async () => {
+  it("una foto va al flujo de incidencias con su pie de foto", async () => {
     await processWebhookPayload(
-      payload({ type: "image", image: { id: "media-1", mime_type: "image/jpeg" } }),
+      payload({
+        type: "image",
+        image: { id: "media-1", mime_type: "image/jpeg", caption: "mira el carro" },
+      }),
     );
 
-    // No hay texto que clasificar: no se gasta una llamada a la IA.
+    // La intención no se clasifica: una foto solo puede ser un reporte.
     expect(mocks.create).not.toHaveBeenCalled();
-    expect(mocks.incidentInsert).toHaveBeenCalledWith({
-      company_id: "company-1",
-      worker_id: "worker-1",
-      description: null,
-    });
-    expect(lastReply()).toContain("he abierto una incidencia");
-    expect(lastReply()).toContain("¿Me cuentas en una frase qué ha pasado?");
+    expect(mocks.registrarIncidencia).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: "worker-1" }),
+      {
+        texto: "mira el carro",
+        media: { kind: "image", id: "media-1", mimeType: "image/jpeg" },
+      },
+    );
+    expect(lastReply()).toBe(RESPUESTA_INCIDENCIA);
   });
 
   it("un audio se trata igual que una foto", async () => {
@@ -216,16 +221,20 @@ describe("foto y audio", () => {
     );
 
     expect(mocks.create).not.toHaveBeenCalled();
-    expect(mocks.incidentInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ description: null }),
+    expect(mocks.registrarIncidencia).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      {
+        texto: null,
+        media: { kind: "audio", id: "media-2", mimeType: "audio/ogg" },
+      },
     );
-    expect(lastReply()).toContain("he abierto una incidencia");
   });
 
   it("los tipos sin flujo (por ejemplo un sticker) no abren nada", async () => {
     await processWebhookPayload(payload({ type: "sticker" }));
 
-    expect(mocks.incidentInsert).not.toHaveBeenCalled();
+    expect(mocks.registrarIncidencia).not.toHaveBeenCalled();
     expect(sendWhatsAppText).not.toHaveBeenCalled();
     // El mensaje sí queda guardado.
     expect(mocks.messageInsert).toHaveBeenCalled();
@@ -241,37 +250,36 @@ describe("fallos de la IA", () => {
     await processWebhookPayload(textPayload("el dispensador de gel no funciona"));
 
     expect(mocks.create).not.toHaveBeenCalled();
-    expect(mocks.incidentInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "el dispensador de gel no funciona" }),
+    expect(mocks.registrarIncidencia).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      { texto: "el dispensador de gel no funciona" },
     );
-    expect(lastReply()).toContain("No he entendido bien tu mensaje");
+    expect(lastReply()).toBe(RESPUESTA_INCIDENCIA);
   });
 
-  it("un rechazo de la IA acaba en incidencia sin clasificar", async () => {
+  it("un rechazo de la IA acaba en incidencia", async () => {
     mocks.create.mockResolvedValue({ stop_reason: "refusal", content: [] });
 
     await processWebhookPayload(textPayload("mensaje que la IA rechaza"));
 
-    expect(mocks.incidentInsert).toHaveBeenCalled();
-    expect(lastReply()).toContain("No he entendido bien tu mensaje");
+    expect(mocks.registrarIncidencia).toHaveBeenCalled();
   });
 
-  it("un error de red acaba en incidencia sin clasificar", async () => {
+  it("un error de red acaba en incidencia", async () => {
     mocks.create.mockRejectedValue(new Error("timeout"));
 
     await processWebhookPayload(textPayload("se ha caído una estantería"));
 
-    expect(mocks.incidentInsert).toHaveBeenCalled();
-    expect(lastReply()).toContain("No he entendido bien tu mensaje");
+    expect(mocks.registrarIncidencia).toHaveBeenCalled();
   });
 
-  it("una intención inventada acaba en incidencia sin clasificar", async () => {
+  it("una intención inventada acaba en incidencia", async () => {
     mocks.create.mockResolvedValue(respuestaIA("saludo"));
 
     await processWebhookPayload(textPayload("mensaje raro"));
 
-    expect(mocks.incidentInsert).toHaveBeenCalled();
-    expect(lastReply()).toContain("No he entendido bien tu mensaje");
+    expect(mocks.registrarIncidencia).toHaveBeenCalled();
   });
 });
 
