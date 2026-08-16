@@ -96,6 +96,15 @@ vi.mock("@/lib/whatsapp/send", () => ({
   sendWhatsAppText: vi.fn().mockResolvedValue(undefined),
 }));
 
+// El enrutado por IA vive en whatsapp-intent.test.ts. Aquí se fija la
+// intención para poder probar el flujo de fichaje sin llamadas externas.
+vi.mock("@/lib/whatsapp/intent", () => ({
+  classifyIntent: vi.fn(async () => ({
+    intent: "fichaje" as const,
+    motivo: "mensaje de prueba",
+  })),
+}));
+
 function textPayload(body: string) {
   return {
     entry: [
@@ -167,6 +176,8 @@ describe("palabras clave", () => {
     expect(mocks.timeEntryInsert).not.toHaveBeenCalled();
   });
 
+  // Sin palabra clave exacta no se ficha aunque la IA vea intención de
+  // fichaje: registrar la entrada exige ubicación.
   it("texto no reconocido responde con ayuda sin guardar acción", async () => {
     await processWebhookPayload(textPayload("hola jefe, qué tal"));
 

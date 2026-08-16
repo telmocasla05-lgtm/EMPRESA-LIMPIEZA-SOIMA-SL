@@ -1,5 +1,43 @@
 # Flujos de conversación de WhatsApp
 
+## Qué quiere el operario: clasificación del mensaje
+
+Antes de tratar un mensaje como fichaje se decide qué intención tiene
+(`lib/whatsapp/process-message.ts`). El orden importa:
+
+```
+1. ¿Palabra clave exacta de fichaje?  → flujo de fichaje (sin IA)
+2. ¿Foto o audio?                     → incidencia sin descripción (sin IA)
+3. Resto de textos                    → clasificación con la API de Claude
+4. Cualquier otro tipo                → solo se guarda, sin respuesta
+```
+
+El paso 1 es la garantía de que **`entro` nunca depende de la IA**: es el caso
+más frecuente, tiene que funcionar aunque la API esté caída y no cuesta nada.
+
+La clasificación devuelve una de tres intenciones, y el prompt vive aparte, en
+`lib/whatsapp/intent.ts`, para poder afinarlo sin tocar el flujo:
+
+| Intención | Ejemplos | Respuesta |
+|---|---|---|
+| `fichaje` | "ya he llegado", "acabo por hoy" | Mensaje de ayuda: `*entro*` / `*salgo*` (sin ubicación no se ficha) |
+| `incidencia` | "se ha roto la fregona", "no queda papel" | Se abre la incidencia y se confirma |
+| `desconocido` | "gracias", "hola jefe", ambiguos | Se le pide que aclare si quiere fichar o reportar |
+
+Detalles de la llamada: modelo `claude-opus-5`, `effort: "low"`, salida
+estructurada con esquema JSON (la API garantiza el formato) y 8 s de tiempo
+máximo. Requiere `ANTHROPIC_API_KEY` (solo servidor).
+
+**Si la clasificación falla** —falta la clave, timeout, rechazo o error de
+red— el mensaje entra como **incidencia sin clasificar** y se avisa al
+operario. Es deliberado: perder un reporte (un cable pelado, un suelo mojado)
+cuesta mucho más que una incidencia de más, que el jefe cierra desde el panel.
+
+> Pendiente del módulo de incidencias (`SPEC-incidencias.md`): tipo, centro
+> deducido del fichaje abierto, descarga de la foto a Storage y aviso al
+> responsable. De momento la incidencia se abre con los valores por defecto
+> (`sin_clasificar`, urgencia normal, abierta) y solo se ve en el panel.
+
 ## Flujo de fichaje (entrada/salida)
 
 ```
@@ -39,10 +77,11 @@ Operario                          Sistema
 | Salida sin entrada previa | Se registra con `valid = false`, se avisa al operario |
 | Fuera de radio | Se registra con `valid = false`, aviso con distancia y radio |
 | Ubicación sin acción pendiente | Se pide escribir `entro` o `salgo` primero |
-| Texto no reconocido | Mensaje de ayuda con las palabras clave |
+| Texto no reconocido | Lo clasifica la IA (ver sección anterior) |
 | Company sin centros con coordenadas | Aviso de contactar con el responsable, no se registra |
 | Teléfono no registrado en `workers` | "Contacta con tu responsable", no se guarda nada |
-| Mensaje no texto/ubicación (audio, imagen…) | Se guarda en `whatsapp_messages`, sin respuesta |
+| Imagen o audio | Se abre una incidencia sin descripción y se pide que la cuente |
+| Otros tipos (sticker, contacto…) | Se guarda en `whatsapp_messages`, sin respuesta |
 
 `valid = false` siempre significa **pendiente de revisión por un jefe** en el
 panel (las políticas RLS permiten a los jefes corregir `time_entries` de su

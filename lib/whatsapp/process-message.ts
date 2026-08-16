@@ -1,11 +1,29 @@
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { abrirIncidencia } from "@/lib/whatsapp/incidencias";
+import { classifyIntent } from "@/lib/whatsapp/intent";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
 import {
   handleLocationMessage,
   handleTextMessage,
+  parseIntent,
   type WhatsAppLocation,
   type WorkerRow,
 } from "@/lib/whatsapp/time-entry";
+
+const PEDIR_ACLARACION =
+  "🤔 No sé si quieres fichar o reportar una incidencia.\n" +
+  "Para fichar escribe *entro* o *salgo*. Si es una incidencia, cuéntame en una frase qué ha pasado.";
+
+const INCIDENCIA_REGISTRADA =
+  "✅ Incidencia registrada. Tu responsable la verá en el panel.";
+
+const INCIDENCIA_SIN_CLASIFICAR =
+  "⚠️ No he entendido bien tu mensaje, así que lo he registrado como incidencia para que tu responsable lo revise.";
+
+const INCIDENCIA_SIN_TEXTO =
+  "📷 Recibido, he abierto una incidencia.\n" +
+  "¿Me cuentas en una frase qué ha pasado? Así tu responsable sabrá qué necesitas.";
 
 // Estructura (parcial) del payload de webhook de la Cloud API de Meta.
 type WhatsAppMessage = {
@@ -101,14 +119,49 @@ async function processIncomingMessage(message: WhatsAppMessage) {
   let reply: string | null = null;
 
   if (message.type === "text") {
-    reply = await handleTextMessage(admin, worker, text ?? "");
+    reply = await routeTextMessage(admin, worker, text ?? "");
   } else if (message.type === "location" && message.location) {
     reply = await handleLocationMessage(admin, worker, message.location);
+  } else if (message.type === "image" || message.type === "audio") {
+    // Una foto o un audio sueltos solo pueden ser un reporte: para fichar hace
+    // falta ubicación. No se clasifican con IA (no hay texto que leer): se abre
+    // la incidencia sin clasificar y se le pide al operario que la describa.
+    await abrirIncidencia(admin, worker, null);
+    reply = INCIDENCIA_SIN_TEXTO;
   } else {
     console.log(`[whatsapp] Mensaje de tipo ${message.type} sin flujo asociado`);
   }
 
   if (reply) {
     await sendWhatsAppText(message.from, reply);
+  }
+}
+
+// Decide qué es un mensaje de texto antes de tratarlo como fichaje.
+async function routeTextMessage(
+  admin: SupabaseClient,
+  worker: WorkerRow,
+  text: string,
+): Promise<string> {
+  // Las palabras clave mandan siempre: "entro" no puede depender de que un
+  // servicio externo esté disponible, y así el caso más frecuente no gasta ni
+  // una llamada a la IA.
+  if (parseIntent(text)) {
+    return handleTextMessage(admin, worker, text);
+  }
+
+  const { intent, motivo, error } = await classifyIntent(text);
+  console.log(`[whatsapp] Intención "${intent}" para «${text}»: ${motivo}`);
+
+  switch (intent) {
+    case "fichaje":
+      // Habla de su fichaje pero sin la palabra clave: handleTextMessage
+      // responde con la ayuda (*entro* / *salgo*) sin registrar nada.
+      return handleTextMessage(admin, worker, text);
+    case "incidencia":
+      await abrirIncidencia(admin, worker, text);
+      return error ? INCIDENCIA_SIN_CLASIFICAR : INCIDENCIA_REGISTRADA;
+    case "desconocido":
+      return PEDIR_ACLARACION;
   }
 }

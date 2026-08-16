@@ -40,6 +40,14 @@ vi.mock("@/lib/whatsapp/send", () => ({
   sendWhatsAppText: vi.fn().mockResolvedValue(undefined),
 }));
 
+// La clasificación con IA se prueba en whatsapp-intent.test.ts; aquí solo
+// interesa el transporte: firma, 200 rápido, guardado y respuesta.
+vi.mock("@/lib/whatsapp/intent", () => ({
+  classifyIntent: vi
+    .fn()
+    .mockResolvedValue({ intent: "desconocido", motivo: "mensaje de prueba" }),
+}));
+
 function sign(body: string, secret = APP_SECRET) {
   return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
 }
@@ -148,11 +156,12 @@ describe("POST /api/whatsapp/webhook", () => {
         content: "hola jefe",
       }),
     );
-    // "hola jefe" no es palabra clave exacta: responde el mensaje de ayuda.
+    // "hola jefe" no es palabra clave exacta: lo clasifica la IA, que aquí
+    // devuelve "desconocido", y se le pide al operario que aclare.
     await vi.waitFor(() => {
       expect(sendWhatsAppText).toHaveBeenCalledWith(
         "34600111222",
-        expect.stringContaining("No te he entendido"),
+        expect.stringContaining("No sé si quieres fichar"),
       );
     });
   });
