@@ -84,6 +84,21 @@ export async function subirFotoIncidencia(
   return path;
 }
 
+// Enlace temporal a una foto del bucket privado. El bucket nunca se expone:
+// esta URL es la única forma de verla fuera del panel.
+export async function urlFirmadaFotoIncidencia(
+  supabase: SupabaseClient,
+  photoPath: string,
+  segundos = 60,
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(BUCKET_INCIDENCIAS)
+    .createSignedUrl(photoPath, segundos);
+
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
 function extension(mimeType: string): string {
   const conocidas: Record<string, string> = {
     "image/jpeg": "jpg",

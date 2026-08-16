@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   incidentInsert: vi.fn(),
   incidentUpdate: vi.fn(),
   upload: vi.fn(),
+  avisarResponsable: vi.fn(),
 }));
 
 vi.mock("@anthropic-ai/sdk", () => ({
@@ -117,6 +118,12 @@ vi.mock("@/lib/whatsapp/send", () => ({
   sendWhatsAppText: vi.fn().mockResolvedValue(undefined),
 }));
 
+// El aviso al responsable se prueba en incidencias-aviso.test.ts; aquí solo
+// importa que se dispare con los datos de la incidencia recién creada.
+vi.mock("@/lib/incidencias/aviso", () => ({
+  avisarResponsable: mocks.avisarResponsable,
+}));
+
 // Respuesta con la forma que devuelve la API con salida estructurada.
 function respuestaIA(tipo: string, urgencia = "normal", resumen = "Resumen") {
   return {
@@ -162,6 +169,7 @@ beforeEach(() => {
   state.whisperOk = true;
 
   mocks.create.mockResolvedValue(respuestaIA("material_roto"));
+  mocks.avisarResponsable.mockResolvedValue({ estado: "enviado" });
 
   mocks.fetch.mockImplementation(async (input: string | URL) => {
     const url = input.toString();
@@ -218,6 +226,36 @@ describe("incidencia de solo texto", () => {
     // Sin adjunto no se baja nada de Meta ni se toca Storage.
     expect(mocks.fetch).not.toHaveBeenCalled();
     expect(mocks.upload).not.toHaveBeenCalled();
+    expect(lastReply()).toBe(
+      "📋 Incidencia registrada: Material roto. Nos ponemos en ello.",
+    );
+  });
+
+  it("avisa al responsable con los datos de la incidencia creada", async () => {
+    await processWebhookPayload(
+      payload({ type: "text", text: { body: "se ha roto la rueda del carro" } }),
+    );
+
+    expect(mocks.avisarResponsable).toHaveBeenCalledWith(expect.anything(), {
+      id: "incident-1",
+      companyId: "company-1",
+      workerId: "worker-1",
+      centerId: "center-1",
+      tipo: "material_roto",
+      urgency: "normal",
+      description: "se ha roto la rueda del carro",
+      photoPath: null,
+    });
+  });
+
+  it("si el aviso falla, la incidencia queda creada y el operario recibe su confirmación", async () => {
+    mocks.avisarResponsable.mockResolvedValue({ estado: "error_envio" });
+
+    await processWebhookPayload(
+      payload({ type: "text", text: { body: "se ha roto la rueda del carro" } }),
+    );
+
+    expect(mocks.incidentInsert).toHaveBeenCalled();
     expect(lastReply()).toBe(
       "📋 Incidencia registrada: Material roto. Nos ponemos en ello.",
     );
@@ -307,6 +345,12 @@ describe("incidencia de texto + foto", () => {
     expect(mocks.incidentUpdate).toHaveBeenCalledWith({
       photo_url: "company-1/incident-1/media-1.jpg",
     });
+    // El responsable recibe el enlace de la foto, así que el aviso necesita
+    // la ruta: por eso la subida va antes del aviso.
+    expect(mocks.avisarResponsable).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ photoPath: "company-1/incident-1/media-1.jpg" }),
+    );
     expect(lastReply()).toBe(
       "📋 Incidencia registrada: Desperfecto en el centro. Nos ponemos en ello.",
     );

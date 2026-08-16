@@ -4,16 +4,12 @@
 // tipo de incidencia* es una vez ya se sabe que lo es.
 
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  TIPOS,
+  type TipoIncidencia,
+  type UrgenciaIncidencia,
+} from "@/lib/incidencias/tipos";
 import { type MediaDescargada } from "@/lib/whatsapp/media";
-
-export type TipoIncidencia =
-  | "material_roto"
-  | "falta_stock"
-  | "desperfecto"
-  | "seguridad"
-  | "sin_clasificar";
-
-export type UrgenciaIncidencia = "alta" | "normal";
 
 export type Clasificacion = {
   tipo: TipoIncidencia;
@@ -25,17 +21,6 @@ export type Clasificacion = {
   // reserva (sin_clasificar, urgencia normal).
   error?: string;
 };
-
-// Etiquetas para los mensajes de WhatsApp y el panel (todo en español).
-export const ETIQUETAS_TIPO: Record<TipoIncidencia, string> = {
-  material_roto: "Material roto",
-  falta_stock: "Falta de stock",
-  desperfecto: "Desperfecto en el centro",
-  seguridad: "Seguridad",
-  sin_clasificar: "Sin clasificar",
-};
-
-const TIPOS = Object.keys(ETIQUETAS_TIPO) as TipoIncidencia[];
 
 const MODEL = "claude-opus-5";
 // En Opus 5 el pensamiento está activo por defecto y cuenta contra max_tokens.

@@ -1,10 +1,11 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
   clasificarIncidencia,
-  ETIQUETAS_TIPO,
   type Clasificacion,
 } from "@/lib/ia/clasificar-incidencia";
 import { transcribirAudio } from "@/lib/ia/transcribir-audio";
+import { avisarResponsable } from "@/lib/incidencias/aviso";
+import { ETIQUETAS_TIPO } from "@/lib/incidencias/tipos";
 import {
   descargarMedia,
   subirFotoIncidencia,
@@ -86,9 +87,25 @@ export async function registrarIncidencia(
   const incidentId = (data as { id: string }).id;
   console.log(`[incidencias] Incidencia ${incidentId} abierta para el worker ${worker.id}`);
 
-  if (foto && mensaje.media) {
-    await guardarFoto(admin, incidentId, worker.company_id, mensaje.media.id, foto);
-  }
+  // La foto va antes del aviso a propósito: así el responsable recibe el
+  // enlace en el mismo mensaje en vez de tener que entrar al panel.
+  const photoPath =
+    foto && mensaje.media
+      ? await guardarFoto(admin, incidentId, worker.company_id, mensaje.media.id, foto)
+      : null;
+
+  // No lanza nunca: si el aviso falla, la incidencia queda con notified_at a
+  // null y el panel la marca como "aviso pendiente".
+  await avisarResponsable(admin, {
+    id: incidentId,
+    companyId: worker.company_id,
+    workerId: worker.id,
+    centerId,
+    tipo: clasificacion.tipo,
+    urgency: clasificacion.urgency,
+    description: descripcion || null,
+    photoPath,
+  });
 
   return respuesta(clasificacion, Boolean(descripcion));
 }
@@ -135,13 +152,14 @@ async function descargar(media: MediaEntrante): Promise<MediaDescargada | null> 
   }
 }
 
+// Devuelve la ruta dentro del bucket, o null si no se pudo guardar.
 async function guardarFoto(
   admin: SupabaseClient,
   incidentId: string,
   companyId: string,
   mediaId: string,
   foto: MediaDescargada,
-) {
+): Promise<string | null> {
   try {
     const path = await subirFotoIncidencia(
       admin,
@@ -156,9 +174,11 @@ async function guardarFoto(
     if (error) throw new Error(error.message);
 
     console.log(`[incidencias] Foto de la incidencia ${incidentId} guardada en ${path}`);
+    return path;
   } catch (error) {
     // La incidencia ya está creada: perder la foto no puede perder el reporte.
     console.error(`[incidencias] No se pudo guardar la foto de ${incidentId}:`, error);
+    return null;
   }
 }
 

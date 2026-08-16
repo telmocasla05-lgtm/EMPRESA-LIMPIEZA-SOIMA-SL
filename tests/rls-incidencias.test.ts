@@ -34,6 +34,11 @@ const admin = createClient(url, serviceRoleKey, {
 const clientA = createClient(url, anonKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+// Segundo usuario de la empresa A, con rol manager: los responsables los ve
+// toda la company pero solo el admin los cambia.
+const clientManagerA = createClient(url, anonKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 const suffix = randomUUID().slice(0, 8);
 const password = `Prueba-${randomUUID()}`;
@@ -48,6 +53,9 @@ let notaBId: string;
 let operarioAId: string;
 let operarioBId: string;
 let centroBId: string;
+let managerAId: string;
+let responsableAId: string;
+let responsableBId: string;
 
 function must<T>(result: {
   data: T;
@@ -118,6 +126,19 @@ async function sembrarEmpresa(nombre: string, marca: string) {
       .single(),
   );
 
+  const responsable = must(
+    await admin
+      .from("incident_responsibles")
+      .insert({
+        company_id: companyId,
+        type: "seguridad",
+        name: `Responsable ${marca}`,
+        phone: `+34700${suffix}${marca}`,
+      })
+      .select("id")
+      .single(),
+  );
+
   const nota = must(
     await admin
       .from("incident_updates")
@@ -136,6 +157,7 @@ async function sembrarEmpresa(nombre: string, marca: string) {
     operarioId: operario.id as string,
     incidenciaId: incidencia.id as string,
     notaId: nota.id as string,
+    responsableId: responsable.id as string,
   };
 }
 
@@ -147,12 +169,14 @@ describe("RLS: aislamiento de incidencias entre companies", () => {
     companyAId = empresaA.companyId;
     operarioAId = empresaA.operarioId;
     incidenciaAId = empresaA.incidenciaId;
+    responsableAId = empresaA.responsableId;
 
     companyBId = empresaB.companyId;
     operarioBId = empresaB.operarioId;
     centroBId = empresaB.centroId;
     incidenciaBId = empresaB.incidenciaId;
     notaBId = empresaB.notaId;
+    responsableBId = empresaB.responsableId;
 
     const { data: userA, error: userAError } =
       await admin.auth.admin.createUser({
@@ -172,12 +196,27 @@ describe("RLS: aislamiento de incidencias entre companies", () => {
     if (userBError) throw userBError;
     userBId = userB.user.id;
 
+    const { data: managerA, error: managerAError } =
+      await admin.auth.admin.createUser({
+        email: `inc-m-${suffix}@example.com`,
+        password,
+        email_confirm: true,
+      });
+    if (managerAError) throw managerAError;
+    managerAId = managerA.user.id;
+
     must(
       await admin
         .from("profiles")
         .insert([
           { id: userAId, company_id: companyAId, full_name: "Admin A", role: "admin" },
           { id: userBId, company_id: companyBId, full_name: "Admin B", role: "admin" },
+          {
+            id: managerAId,
+            company_id: companyAId,
+            full_name: "Manager A",
+            role: "manager",
+          },
         ])
         .select("id"),
     );
@@ -187,11 +226,19 @@ describe("RLS: aislamiento de incidencias entre companies", () => {
       password,
     });
     if (signInError) throw signInError;
+
+    const { error: signInManagerError } =
+      await clientManagerA.auth.signInWithPassword({
+        email: `inc-m-${suffix}@example.com`,
+        password,
+      });
+    if (signInManagerError) throw signInManagerError;
   }, 90_000);
 
   afterAll(async () => {
     if (userAId) await admin.auth.admin.deleteUser(userAId);
     if (userBId) await admin.auth.admin.deleteUser(userBId);
+    if (managerAId) await admin.auth.admin.deleteUser(managerAId);
     // Borra en cascada clientes, centros, operarios, incidencias y notas.
     if (companyAId) await admin.from("companies").delete().eq("id", companyAId);
     if (companyBId) await admin.from("companies").delete().eq("id", companyBId);
@@ -346,6 +393,98 @@ describe("RLS: aislamiento de incidencias entre companies", () => {
     expect(incidenciaB.status).toBe("open");
     expect(incidenciaB.resolved_at).toBeNull();
     expect(incidenciaB.assigned_to).toBeNull();
+  });
+
+  it("no lee ni toca los responsables de otra company", { timeout: 20_000 }, async () => {
+    const visibles = must(
+      await clientA
+        .from("incident_responsibles")
+        .select("id, company_id, phone"),
+    );
+    expect(visibles.length).toBeGreaterThan(0);
+    expect(
+      visibles.every(
+        (r: { company_id: string }) => r.company_id === companyAId,
+      ),
+    ).toBe(true);
+    expect(visibles.map((r: { id: string }) => r.id)).not.toContain(responsableBId);
+
+    // El teléfono del responsable de B es justo lo que no puede filtrarse: con
+    // él se sabría a quién avisa la competencia.
+    const porId = must(
+      await clientA
+        .from("incident_responsibles")
+        .select("phone")
+        .eq("id", responsableBId),
+    );
+    expect(porId).toEqual([]);
+
+    // Cambiar a quién avisa B: la RLS no deja ver la fila.
+    const actualizados = must(
+      await clientA
+        .from("incident_responsibles")
+        .update({ phone: "+34999999999" })
+        .eq("id", responsableBId)
+        .select("id"),
+    );
+    expect(actualizados).toEqual([]);
+
+    // Ni colar una fila con el company_id de B.
+    const { error: errorAjeno } = await clientA
+      .from("incident_responsibles")
+      .insert({
+        company_id: companyBId,
+        type: "material_roto",
+        name: "Intruso",
+        phone: "+34999999999",
+      });
+    expect(errorAjeno).not.toBeNull();
+
+    const responsableB = must(
+      await admin
+        .from("incident_responsibles")
+        .select("phone")
+        .eq("id", responsableBId)
+        .single(),
+    );
+    expect(responsableB.phone).toBe(`+34700${suffix}B`);
+  });
+
+  it("el manager ve los responsables pero solo el admin los cambia", {
+    timeout: 20_000,
+  }, async () => {
+    // Ver, sí: necesita saber a quién se avisó de cada incidencia.
+    const visibles = must(
+      await clientManagerA.from("incident_responsibles").select("id"),
+    );
+    expect(visibles.map((r: { id: string }) => r.id)).toContain(responsableAId);
+
+    // Cambiarlos, no: quién recibe los avisos de seguridad no es gestión diaria.
+    const actualizados = must(
+      await clientManagerA
+        .from("incident_responsibles")
+        .update({ phone: "+34999999999" })
+        .eq("id", responsableAId)
+        .select("id"),
+    );
+    expect(actualizados).toEqual([]);
+
+    const { error: errorAlta } = await clientManagerA
+      .from("incident_responsibles")
+      .insert({
+        company_id: companyAId,
+        type: "falta_stock",
+        name: "Manager metiendo mano",
+        phone: "+34999999999",
+      });
+    expect(errorAlta).not.toBeNull();
+
+    // El admin de la misma company sí puede.
+    const { error: errorAdmin } = await clientA
+      .from("incident_responsibles")
+      .update({ phone: "+34700000001" })
+      .eq("id", responsableAId);
+    expect(errorAdmin).toBeNull();
   });
 
   it("el aislamiento no es un falso positivo: con service_role se ven las dos", {

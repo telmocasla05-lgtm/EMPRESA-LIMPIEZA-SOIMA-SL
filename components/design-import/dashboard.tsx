@@ -11,6 +11,7 @@ import {
   Building2,
   MapPin,
   ReceiptEuro,
+  TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -140,6 +141,13 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/dashboard/clientes', label: 'Clientes', icon: Building2 },
   { href: '/dashboard/centros', label: 'Centros', icon: MapPin },
   { href: '/dashboard/facturas', label: 'Facturas', icon: ReceiptEuro },
+  // De momento la sección solo tiene la pantalla de responsables; cuando
+  // exista el listado de incidencias, este href apunta a /dashboard/incidencias.
+  {
+    href: '/dashboard/incidencias/responsables',
+    label: 'Incidencias',
+    icon: TriangleAlert,
+  },
 ];
 
 export function DashboardShell({

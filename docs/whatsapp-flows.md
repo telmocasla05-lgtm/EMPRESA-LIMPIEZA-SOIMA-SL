@@ -33,9 +33,9 @@ red— el mensaje entra como **incidencia sin clasificar** y se avisa al
 operario. Es deliberado: perder un reporte (un cable pelado, un suelo mojado)
 cuesta mucho más que una incidencia de más, que el jefe cierra desde el panel.
 
-> Pendiente del módulo de incidencias (`SPEC-incidencias.md`): el **aviso al
-> responsable** del tipo y **la sección del panel**. Hasta que exista la
-> pantalla, una incidencia solo es visible consultando la tabla `incidents` en
+> Pendiente del módulo de incidencias (`SPEC-incidencias.md`): **el listado y
+> el detalle en el panel**. Lo único que hay de pantalla es la configuración de
+> responsables; el resto solo se ve consultando la tabla `incidents` en
 > Supabase.
 
 ## Flujo de incidencias
@@ -83,6 +83,41 @@ El alta vive en `lib/whatsapp/incidencias.ts`. Pasos, en orden:
 6. **Foto** al bucket privado `incidencias`, en
    `<company_id>/<incident_id>/<media_id>.<ext>`, y la ruta en `photo_url`
    (una ruta, no una URL pública: el panel la sirve firmada a 60 s).
+7. **Aviso al responsable** por WhatsApp (`lib/incidencias/aviso.ts`).
+
+### A quién se avisa
+
+`incident_responsibles` guarda un responsable por tipo y empresa, configurable
+en **Panel → Incidencias → Responsables** (solo admin; los manager lo ven). El
+orden es:
+
+```
+1. ¿Hay responsable para ese tipo?   → a su teléfono
+2. Si no, o si es sin_clasificar     → al teléfono de la empresa (companies.phone)
+3. Si la empresa tampoco tiene       → no se avisa: queda "aviso pendiente"
+```
+
+`sin_clasificar` nunca tiene responsable a propósito: una incidencia que la IA
+no pudo tipificar no tiene dueño natural, así que la coge quien manda.
+
+El mensaje lleva tipo, centro, operario, descripción y el enlace de la foto
+(firmado, **7 días**: el responsable abre el WhatsApp cuando puede):
+
+```
+🔧 Incidencia · Material roto
+Oficinas Norte
+Operario: Marta Ruiz
+"Se ha roto la rueda del carro grande"
+📷 Foto (el enlace caduca en 7 días): https://…
+```
+
+Con urgencia alta la primera línea pasa a `🚨 URGENTE · Incidencia · Seguridad`.
+Sin centro se omite esa línea; sin descripción se pone `(sin descripción
+todavía)`; sin foto no hay última línea.
+
+Tras el envío se guardan `notified_phone` y `notified_at`. Si el envío falla,
+**la incidencia queda creada** con `notified_at` a null: el aviso nunca tumba
+el alta.
 
 Respuestas al operario:
 
