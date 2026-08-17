@@ -83,12 +83,13 @@ export function StatusPill({
   tone,
   children,
 }: {
-  tone: 'ok' | 'warn' | 'off';
+  tone: 'ok' | 'warn' | 'info' | 'off';
   children: React.ReactNode;
 }) {
   const tones = {
     ok: 'bg-[#e8f6ee] text-[#1f7a4d] border-[#b9dfc9]',
     warn: 'bg-[#fffaf0] text-[#8a5a18] border-[#f3ddb6]',
+    info: 'bg-[#eef4fd] text-[#1f4d8a] border-[#c3d7f2]',
     off: 'bg-[#f1f0ee] text-[#6b6560] border-[#e7e4e0]',
   } as const;
   return (
@@ -141,14 +142,16 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/dashboard/clientes', label: 'Clientes', icon: Building2 },
   { href: '/dashboard/centros', label: 'Centros', icon: MapPin },
   { href: '/dashboard/facturas', label: 'Facturas', icon: ReceiptEuro },
-  // De momento la sección solo tiene la pantalla de responsables; cuando
-  // exista el listado de incidencias, este href apunta a /dashboard/incidencias.
-  {
-    href: '/dashboard/incidencias/responsables',
-    label: 'Incidencias',
-    icon: TriangleAlert,
-  },
+  { href: '/dashboard/incidencias', label: 'Incidencias', icon: TriangleAlert },
 ];
+
+// "Hoy" vive en /dashboard, que es prefijo de todo lo demás: solo marca cuando
+// la ruta coincide exacta. El resto marca también en sus subpáginas, para que
+// el detalle de una incidencia no deje la navegación sin ningún activo.
+function esActiva(pathname: string, href: string): boolean {
+  if (href === '/dashboard') return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function DashboardShell({
   email,
@@ -182,7 +185,7 @@ export function DashboardShell({
           className="flex flex-col gap-0.5 p-3 max-[900px]:flex-row max-[900px]:gap-1 max-[900px]:overflow-x-auto"
         >
           {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
+            const active = esActiva(pathname, href);
             return (
               <Link
                 key={href}
@@ -259,34 +262,60 @@ export type PendienteRevision = {
   motivo: string; // "fuera del radio GPS (a 230 m del centro)"
 };
 
-function MetricCard({
+export function MetricCard({
   label,
   value,
   footnote,
-  alert = false,
+  tone = 'neutral',
+  href,
 }: {
   label: string;
   value: number | string;
   footnote: string;
-  alert?: boolean;
+  tone?: 'neutral' | 'warn' | 'danger';
+  // Si se pasa, la tarjeta entera es un enlace (la vista Hoy lleva así al
+  // listado de incidencias ya filtrado).
+  href?: string;
 }) {
-  return (
-    <div
-      className={`rounded-3xl border border-[#e7e4e0] bg-white p-[26px] ${T.shSm} ${
-        alert ? 'border-l-[3px] border-l-[#d9973c]' : ''
-      }`}
-    >
+  const bordes = {
+    neutral: '',
+    warn: 'border-l-[3px] border-l-[#d9973c]',
+    danger: 'border-l-[3px] border-l-[#ec3013]',
+  } as const;
+  const cifras = {
+    neutral: '',
+    warn: 'text-[#d9973c]',
+    danger: 'text-[#ec3013]',
+  } as const;
+
+  const contenido = (
+    <>
       <p className={`m-0 text-[13px] font-medium ${T.muted}`}>{label}</p>
       <p
-        className={`m-0 mt-2.5 text-[50px] font-extrabold leading-none tracking-[-0.04em] tabular-nums ${
-          alert ? 'text-[#d9973c]' : ''
-        }`}
+        className={`m-0 mt-2.5 text-[50px] font-extrabold leading-none tracking-[-0.04em] tabular-nums ${cifras[tone]}`}
       >
         {value}
       </p>
       <p className={`m-0 mt-2.5 text-sm ${T.muted}`}>{footnote}</p>
-    </div>
+    </>
   );
+
+  const clases = `block rounded-3xl border border-[#e7e4e0] bg-white p-[26px] no-underline ${T.ink} ${T.shSm} ${bordes[tone]}`;
+
+  // La sombra del hover va escrita entera: Tailwind no genera clases
+  // construidas por concatenación (ver la nota de Button).
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`${clases} transition-shadow duration-150 ${T.focus}
+                    hover:shadow-[0_4px_16px_rgba(22,19,15,.06),0_1px_3px_rgba(22,19,15,.04)]`}
+      >
+        {contenido}
+      </Link>
+    );
+  }
+  return <div className={clases}>{contenido}</div>;
 }
 
 export function TodayDashboard({
@@ -351,7 +380,7 @@ export function TodayDashboard({
           label="Fichajes pendientes de revisión"
           value={visibles.length}
           footnote={visibles.length > 0 ? 'Requieren tu revisión' : 'Nada que revisar'}
-          alert={visibles.length > 0}
+          tone={visibles.length > 0 ? 'warn' : 'neutral'}
         />
       </section>
 

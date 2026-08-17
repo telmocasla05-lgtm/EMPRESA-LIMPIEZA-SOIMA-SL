@@ -101,6 +101,15 @@ export function formatHora(value: string | Date): string {
   }).format(typeof value === "string" ? new Date(value) : value);
 }
 
+// Fecha y hora completas: "17/08/2026, 09:41".
+export function formatFechaHora(value: string | Date): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: MADRID_TZ,
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(typeof value === "string" ? new Date(value) : value);
+}
+
 export function formatDuracion(ms: number): string {
   const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
   const hours = Math.floor(totalMinutes / 60);
