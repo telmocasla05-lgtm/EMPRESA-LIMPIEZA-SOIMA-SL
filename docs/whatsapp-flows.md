@@ -189,7 +189,7 @@ teléfonos no registrados, que solo quedan en logs).
 
 ## Aviso de turno del día siguiente (saliente, sin conversación)
 
-Cada día a las **20:00 Europe/Madrid** un cron de Vercel
+Cada día entre las **19:00 y las 20:00 Europe/Madrid** un cron de Vercel
 (`/api/cron/avisos-turnos`, protegido con `CRON_SECRET`) envía a cada
 operario sus turnos de mañana aún no notificados:
 
@@ -199,11 +199,20 @@ operario sus turnos de mañana aún no notificados:
 
 Tras el envío se marca `shifts.notified = true`. Si el envío falla, el turno
 queda sin marcar y se registra en logs; los turnos de workers desactivados se
-omiten. Vercel Cron solo programa en UTC, así que hay dos pasadas (18:00 y
-19:00 UTC) y el endpoint ejecuta solo la que cae a las 20:00 de Madrid
-(`?force=1` la salta para pruebas manuales).
+omiten.
+
+Sobre la hora: Vercel Cron solo programa en UTC y el plan Hobby permite una
+sola pasada al día, así que hay una única llamada a las 18:00 UTC. Con horario
+de verano eso son las 20:00 de Madrid y en invierno las 19:00, y el endpoint
+acepta ambas: exigir las 20:00 clavadas dejaría medio año sin avisos. Con el
+plan Pro se vuelve a dos pasadas (18:00 y 19:00 UTC) y a exigir solo las 20:00.
+`?force=1` salta la comprobación para pruebas manuales.
 
 ## Aviso de ausencia al admin (saliente, sin conversación)
+
+> ⚠️ **Sin programar en el plan Hobby de Vercel.** El endpoint funciona, pero
+> Hobby no permite pasadas cada 15 minutos, así que no está en `vercel.json`:
+> hoy solo se dispara a mano. Vuelve a automatizarse al pasar a Pro.
 
 Cada **15 minutos** un cron de Vercel (`/api/cron/ausencias`, protegido con
 `CRON_SECRET`) busca turnos de hoy y de ayer (por los cercanos a medianoche)
